@@ -4,8 +4,9 @@ import Link from 'next/link';
 import {
   Zap, ArrowRight, ChevronRight, Rocket,
   Target, Trophy, Users, Star, Code,
-  Briefcase, GraduationCap, Shield, Sparkles
+  Briefcase, GraduationCap, Shield, Sparkles, TrendingUp
 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import Button from '@/components/Button';
 import Card from '@/components/Card';
 import Badge from '@/components/Badge';
@@ -47,6 +48,26 @@ const stats = [
   { value: '200+', label: 'TASKS COMPLETED', icon: Star },
   { value: '95%', label: 'PLACEMENT RATE', icon: Rocket },
 ];
+
+const trendingSkillsData = [
+  { name: 'AI & Machine Learning', growth: 88, color: '#BEF264' },
+  { name: 'Cloud & DevOps', growth: 74, color: '#C084FC' },
+  { name: 'Cybersecurity', growth: 68, color: '#FDE047' },
+  { name: 'Data Engineering', growth: 62, color: '#000000' },
+  { name: 'Full-Stack (Next.js)', growth: 55, color: '#ef4444' },
+];
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white border-brutal shadow-brutal-sm p-3 font-mono text-xs z-50">
+        <p className="font-bold mb-1 uppercase">{label}</p>
+        <p className="text-muted">{`Demand Growth: `}<span className="text-black font-black">{payload[0].value}%</span></p>
+      </div>
+    );
+  }
+  return null;
+};
 
 export default function LandingPage() {
   return (
@@ -135,6 +156,58 @@ export default function LandingPage() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {/* ─── Trending Skills 2026 ──────────────── */}
+      <section className="py-16 sm:py-24 bg-white border-b-4 border-black">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex flex-col lg:flex-row items-center gap-12">
+            <div className="flex-1 text-center lg:text-left">
+              <Badge variant="dark" className="mb-4">
+                <TrendingUp size={12} className="mr-1" />
+                2026 JOB TRENDS
+              </Badge>
+              <h2 className="heading-brutal text-4xl sm:text-5xl lg:text-6xl mb-6">
+                THE FUTURE IS
+                <br />
+                <span className="inline-block mt-2 text-lime bg-black px-3 pb-1 shadow-[4px_4px_0_0_#BEF264]">DATA-DRIVEN</span>
+              </h2>
+              <p className="font-mono text-sm leading-relaxed text-muted max-w-lg mx-auto lg:mx-0 mb-8">
+                Based on projected industry demands for 2026, tech roles are polarizing. Specialized skills in AI, Cloud architecture, and secure data pipelines are skyrocketing.
+                <br /><br />
+                Our roadmaps prioritize the skills that future employers actually hire for.
+              </p>
+              <div className="flex gap-4 justify-center lg:justify-start">
+                <Link href="/discover">
+                  <Button variant="primary" icon={ArrowRight} iconPosition="right">Explore Roadmaps</Button>
+                </Link>
+              </div>
+            </div>
+            
+            {/* Chart Area */}
+            <div className="flex-1 w-full max-w-xl">
+              <Card variant="muted" padding="lg" className="w-full h-80 bg-bg-dark relative">
+                <div className="absolute top-4 left-4 z-10">
+                  <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-muted">YoY Growth Demand</h3>
+                </div>
+                <div className="w-full h-full pt-6">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={trendingSkillsData} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
+                      <XAxis type="number" hide domain={[0, 100]} />
+                      <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 'bold', fill: '#000' }} width={120} />
+                      <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.03)' }} />
+                      <Bar dataKey="growth" barSize={24} background={{ fill: 'rgba(0,0,0,0.05)' }}>
+                        {trendingSkillsData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+            </div>
+          </div>
         </div>
       </section>
 

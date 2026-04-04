@@ -46,12 +46,45 @@ export async function middleware(request) {
     return NextResponse.redirect(url);
   }
 
+  const role = user?.user_metadata?.role || 'student';
+
   // If logged in user visits /auth, redirect to dashboard
   if (user && request.nextUrl.pathname === '/auth') {
-    const role = user.user_metadata?.role || 'student';
     const url = request.nextUrl.clone();
     url.pathname = `/dashboard/${role}`;
     return NextResponse.redirect(url);
+  }
+
+  // Role-based route restrictions
+  if (user) {
+    const pathname = request.nextUrl.pathname;
+    
+    // Redirect /dashboard to role-specific dashboard
+    if (pathname === '/dashboard') {
+      const url = request.nextUrl.clone();
+      url.pathname = `/dashboard/${role}`;
+      return NextResponse.redirect(url);
+    }
+
+    // Restrict /dashboard/[role]
+    if (pathname.startsWith('/dashboard/')) {
+      const requestedRole = pathname.split('/')[2];
+      if (requestedRole && requestedRole !== role) {
+        const url = request.nextUrl.clone();
+        url.pathname = `/dashboard/${role}`;
+        return NextResponse.redirect(url);
+      }
+    }
+
+    // Restrict /onboarding/[role]
+    if (pathname.startsWith('/onboarding/')) {
+      const requestedRole = pathname.split('/')[2];
+      if (requestedRole && requestedRole !== role) {
+        const url = request.nextUrl.clone();
+        url.pathname = `/dashboard/${role}`;
+        return NextResponse.redirect(url);
+      }
+    }
   }
 
   return supabaseResponse;

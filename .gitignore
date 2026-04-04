@@ -37,3 +37,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+
+#logs
+.git_status.txt
+.npm_build.log
+.npm_install.log
+
+#
