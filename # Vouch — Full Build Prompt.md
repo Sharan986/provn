@@ -1,6 +1,6 @@
-# Vouch — Full Build Prompt
+# Provn — Full Build Prompt
 
-> Build a **career readiness SaaS platform** called **Vouch** using **Next.js 16** (App Router) and **Tailwind CSS v4.2**. The backend is **Supabase** (Auth + Postgres). The design language is **Neo-Brutalism**.
+> Build a **career readiness SaaS platform** called **Provn** using **Next.js 16** (App Router) and **Tailwind CSS v4.2**. The backend is **Supabase** (Auth + Postgres). The design language is **Neo-Brutalism**.
 
 ---
 
@@ -263,5 +263,5 @@ Wraps children with:
 
 - Imports `globals.css`
 - Google Font: Inter
-- Meta tags + title: "Vouch — Campus to Careers"
+- Meta tags + title: "Provn — Campus to Careers"
 - Wraps `{children}` with `<Providers>` → `<Layout>` (which renders `<Navbar />`)

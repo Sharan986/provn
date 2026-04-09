@@ -76,10 +76,10 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 bg-lime border-2 border-black shadow-brutal-sm flex items-center justify-center group-hover:translate-x-[1px] group-hover:translate-y-[1px] group-hover:shadow-none transition-all">
+            <div className="w-8 h-8 bg-lime border-2 border-black shadow-brutal-sm flex items-center justify-center group-hover:translate-x-px group-hover:translate-y-px group-hover:shadow-none transition-all">
               <Zap size={16} className="text-black" />
             </div>
-            <span className="heading-brutal text-xl tracking-tighter">VOUCH</span>
+            <span className="heading-brutal text-xl tracking-tighter">PROVN</span>
           </Link>
 
           {/* Desktop Nav */}

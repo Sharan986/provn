@@ -77,7 +77,7 @@ export default function OnboardingPage() {
         currentRoadmapId: selectedRoadmap || null,
         orgName: orgName || null,
       });
-      toast.success('Profile set up! Welcome to Vouch.');
+      toast.success('Profile set up! Welcome to Provn.');
       router.push(`/dashboard/${role}`);
     } catch {
       toast.error('Failed to save. Redirecting...');

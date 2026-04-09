@@ -96,7 +96,7 @@ export default function PortfolioPage() {
       return;
     }
     toast.info(`Opening email to ${profile.email}...`);
-    window.open(`mailto:${profile.email}?subject=Opportunity from Vouch&body=Hi ${profile.name},`);
+    window.open(`mailto:${profile.email}?subject=Opportunity from Provn&body=Hi ${profile.name},`);
   };
 
   const diffColor = (d) => d === 'beginner' ? 'lime' : d === 'intermediate' ? 'yellow' : 'purple';

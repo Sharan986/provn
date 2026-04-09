@@ -78,7 +78,7 @@ function AuthContent() {
             <Zap size={32} />
           </div>
           <h1 className="heading-brutal text-3xl sm:text-4xl mb-2">
-            {isRegister ? 'JOIN VOUCH' : 'WELCOME BACK'}
+            {isRegister ? 'JOIN PROVN' : 'WELCOME BACK'}
           </h1>
           <p className="font-mono text-sm text-muted">
             {isRegister

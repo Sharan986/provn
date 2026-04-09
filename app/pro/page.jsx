@@ -98,7 +98,7 @@ export default function ProPage() {
           <span className="text-purple">CAREER GAME</span>
         </h1>
         <p className="font-mono text-sm text-muted max-w-md mx-auto">
-          Start free, upgrade when you&apos;re ready to unlock the full Vouch experience.
+          Start free, upgrade when you&apos;re ready to unlock the full Provn experience.
         </p>
       </div>
 

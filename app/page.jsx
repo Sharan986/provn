@@ -90,7 +90,7 @@ export default function LandingPage() {
               <span className="relative">
                 CAREER.
                 <svg className="absolute -bottom-2 left-0 w-full h-4" viewBox="0 0 400 12">
-                  <path d="M0 6 Q100 0 200 6 Q300 12 400 6" stroke="black" strokeWidth="3" fill="none" />
+                  <path d="M0 6 Q100 0 200 6 Q300 12 400 6" stroke="black" strokeWidth="3" fill="none" /> 
                 </svg>
               </span>
             </h1>
@@ -171,7 +171,7 @@ export default function LandingPage() {
               <h2 className="heading-brutal text-4xl sm:text-5xl lg:text-6xl mb-6">
                 THE FUTURE IS
                 <br />
-                <span className="inline-block mt-2 text-lime bg-black px-3 pb-1 shadow-[4px_4px_0_0_#BEF264]">DATA-DRIVEN</span>
+                <span className="inline-block mt-2 text-lime bg-black px-3 pb-1 shadow-brutal-lime">DATA-DRIVEN</span>
               </h2>
               <p className="font-mono text-sm leading-relaxed text-muted max-w-lg mx-auto lg:mx-0 mb-8">
                 Based on projected industry demands for 2026, tech roles are polarizing. Specialized skills in AI, Cloud architecture, and secure data pipelines are skyrocketing.
@@ -252,7 +252,7 @@ export default function LandingPage() {
       <section className="py-16 sm:py-24 bg-white border-y-4 border-black">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
-            <h2 className="heading-brutal text-4xl sm:text-5xl mb-4">WHO IS VOUCH FOR?</h2>
+            <h2 className="heading-brutal text-4xl sm:text-5xl mb-4">WHO IS PROVN FOR?</h2>
             <p className="font-mono text-sm text-muted max-w-lg mx-auto">
               Whether you&apos;re a student, recruiter, or institution — there&apos;s a seat for you at the table.
             </p>
@@ -293,7 +293,7 @@ export default function LandingPage() {
             <span className="text-lime">START DOING.</span>
           </h2>
           <p className="font-mono text-sm text-muted-light mb-8 max-w-md mx-auto">
-            Join hundreds of students already building their careers on Vouch. Free to start, no credit card required.
+            Join hundreds of students already building their careers on Provn. Free to start, no credit card required.
           </p>
           <Link href="/auth?mode=register">
             <Button variant="primary" size="lg" icon={Rocket} iconPosition="right">
@@ -312,12 +312,12 @@ export default function LandingPage() {
                 <div className="w-8 h-8 bg-lime border-2 border-black flex items-center justify-center">
                   <Zap size={16} />
                 </div>
-                <span className="heading-brutal text-lg">VOUCH</span>
+                <span className="heading-brutal text-lg">PROVN</span>
               </div>
               <p className="font-mono text-xs text-muted">
                 Campus to Careers.
                 <br />
-                © {new Date().getFullYear()} Vouch
+                © {new Date().getFullYear()} Provn
               </p>
             </div>
             <div>
@@ -334,6 +334,8 @@ export default function LandingPage() {
                 <span className="font-mono text-xs text-muted">About (Coming Soon)</span>
                 <span className="font-mono text-xs text-muted">Blog (Coming Soon)</span>
                 <Link href="/pro" className="font-mono text-xs hover:text-lime transition-colors">Pricing</Link>
+                <a href="mailto:hello@provn.live" className="font-mono text-xs hover:text-lime transition-colors">hello@provn.live</a>
+                <a href="mailto:support@provn.live" className="font-mono text-xs hover:text-lime transition-colors">support@provn.live</a>
               </div>
             </div>
             <div>

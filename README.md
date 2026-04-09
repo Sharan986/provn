@@ -1,8 +1,10 @@
-# Vouch 🎯
+# Provn 🎯
 
 **Skill-based learning platform connecting students with industry-verified tasks**
 
-Vouch is a modern learning platform that bridges the gap between academic knowledge and industry requirements. Students complete real-world tasks, get verified by industry professionals, and build a credible portfolio.
+Provn is a modern learning platform that bridges the gap between academic knowledge and industry requirements. Students complete real-world tasks, get verified by industry professionals, and build a credible portfolio.
+
+Contact: hello@provn.live and support@provn.live.
 
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)
 ![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react)
@@ -59,8 +61,8 @@ Vouch is a modern learning platform that bridges the gap between academic knowle
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/vouch.git
-   cd vouch
+   git clone https://github.com/yourusername/provn.git
+   cd provn
    ```
 
 2. **Install dependencies**
@@ -109,7 +111,7 @@ Vouch is a modern learning platform that bridges the gap between academic knowle
 ## 📁 Project Structure
 
 ```
-vouch/
+provn/
 ├── app/                    # Next.js App Router pages
 │   ├── auth/              # Authentication page
 │   ├── dashboard/         # Role-based dashboards
@@ -170,7 +172,7 @@ users    (1) ──── (n) submissions
 
 ## 🔐 Authentication & Roles
 
-Vouch uses Supabase Auth with role-based access control:
+Provn uses Supabase Auth with role-based access control:
 
 | Role | Access |
 |------|--------|
