@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import Badge from './Badge';
 import Button from './Button';
-import { createClient } from '@/utils/supabase/client';
+import { getCurrentUser, signOut } from '@/lib/actions/auth';
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -20,30 +20,28 @@ export default function Navbar() {
   const [role, setRole] = useState(null);
 
   useEffect(() => {
-    const supabase = createClient();
+    let mounted = true;
     
-    supabase.auth.getUser().then(({ data }) => {
-      if (data?.user) {
-        setUser(data.user);
-        setRole(data.user.user_metadata?.role || 'student');
-      } else {
-        setUser(null);
-        setRole(null);
+    // Check auth status
+    getCurrentUser().then((usr) => {
+      if (mounted) {
+        if (usr) {
+          setUser(usr);
+          setRole(usr.profile?.role || 'student');
+        } else {
+          setUser(null);
+          setRole(null);
+        }
       }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        setRole(session.user.user_metadata?.role || 'student');
-      } else {
+    }).catch(() => {
+      if (mounted) {
         setUser(null);
         setRole(null);
       }
     });
 
     return () => {
-      subscription.unsubscribe();
+      mounted = false;
     };
   }, [pathname]);
 
@@ -54,10 +52,7 @@ export default function Navbar() {
   const isLoggedIn = !!user;
 
   const handleSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push('/');
-    router.refresh();
+    await signOut();
   };
 
   const dashboardPath = `/dashboard/${role || 'student'}`;
@@ -193,3 +188,4 @@ export default function Navbar() {
     </nav>
   );
 }
+
