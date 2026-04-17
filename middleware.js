@@ -1,41 +1,17 @@
-import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
+import { decodeJwt } from './utils/jwt';
 
-export async function middleware(request) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
+export function middleware(request) {
+  let response = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            request.cookies.set(name, value)
-          );
-          supabaseResponse = NextResponse.next({
-            request,
-          });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Get token from cookies
+  const token = request.cookies.get('provn_access')?.value;
+  const user = token ? decodeJwt(token) : null;
+  const role = user?.role || 'student';
 
   // Protected routes
   const protectedPaths = ['/dashboard', '/simulator', '/discover', '/tasks'];
-  const isProtected = protectedPaths.some(path =>
+  const isProtected = protectedPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   );
 
@@ -45,8 +21,6 @@ export async function middleware(request) {
     url.searchParams.set('mode', 'login');
     return NextResponse.redirect(url);
   }
-
-  const role = user?.user_metadata?.role || 'student';
 
   // If logged in user visits /auth, redirect to dashboard
   if (user && request.nextUrl.pathname === '/auth') {
@@ -87,11 +61,11 @@ export async function middleware(request) {
     }
   }
 
-  return supabaseResponse;
+  return response;
 }
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

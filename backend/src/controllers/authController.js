@@ -1,0 +1,248 @@
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const pool = require('../db/pool');
+
+const ACCESS_SECRET  = process.env.JWT_SECRET         || 'provn_access_super_secret_change_me';
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'provn_refresh_super_secret_change_me';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function signTokens(userId, role) {
+  const accessToken  = jwt.sign({ userId, role }, ACCESS_SECRET,  { expiresIn: '15m' });
+  const refreshToken = jwt.sign({ userId },       REFRESH_SECRET, { expiresIn: '7d'  });
+  return { accessToken, refreshToken };
+}
+
+function setTokenCookies(res, accessToken, refreshToken) {
+  const isProd = process.env.NODE_ENV === 'production';
+
+  res.cookie('provn_access', accessToken, {
+    httpOnly: true,
+    secure:   isProd,
+    sameSite: 'lax',
+    maxAge:   15 * 60 * 1000,           // 15 minutes
+  });
+
+  res.cookie('provn_refresh', refreshToken, {
+    httpOnly: true,
+    secure:   isProd,
+    sameSite: 'lax',
+    maxAge:   7 * 24 * 60 * 60 * 1000, // 7 days
+  });
+}
+
+function safeUser(row) {
+  const { password_hash, ...safe } = row;
+  return safe;
+}
+
+// ─── Controllers ──────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/auth/register
+ * Body: { email, password, name, role }
+ */
+async function register(req, res) {
+  const { email, password, name, role = 'student' } = req.body;
+
+  if (!email || !password || !name) {
+    return res.status(400).json({ error: 'email, password and name are required' });
+  }
+
+  const validRoles = ['student', 'industry', 'college', 'admin'];
+  if (!validRoles.includes(role)) {
+    return res.status(400).json({ error: 'Invalid role' });
+  }
+
+  try {
+    // Check duplicate
+    const { rows: existing } = await pool.query(
+      'SELECT id FROM users WHERE email = $1', [email.toLowerCase()]
+    );
+    if (existing.length) {
+      return res.status(409).json({ error: 'This email is already registered. Please log in.' });
+    }
+
+    const password_hash = await bcrypt.hash(password, 12);
+
+    const { rows } = await pool.query(
+      `INSERT INTO users (email, password_hash, name, role)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, email, name, role, branch, interests,
+                 current_roadmap_id, subscription_tier, company_name, avatar_url, created_at`,
+      [email.toLowerCase(), password_hash, name, role]
+    );
+
+    const user = rows[0];
+    const { accessToken, refreshToken } = signTokens(user.id, user.role);
+    setTokenCookies(res, accessToken, refreshToken);
+
+    return res.status(201).json({ success: true, role: user.role, data: safeUser(user) });
+  } catch (err) {
+    console.error('register error:', err);
+    return res.status(500).json({ error: 'Registration failed' });
+  }
+}
+
+/**
+ * POST /api/auth/login
+ * Body: { email, password }
+ */
+async function login(req, res) {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'email and password are required' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, email, password_hash, name, role, branch, interests,
+              current_roadmap_id, subscription_tier, company_name, avatar_url
+       FROM users WHERE email = $1`,
+      [email.toLowerCase()]
+    );
+
+    const user = rows[0];
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const { accessToken, refreshToken } = signTokens(user.id, user.role);
+    setTokenCookies(res, accessToken, refreshToken);
+
+    return res.json({ success: true, role: user.role, data: safeUser(user) });
+  } catch (err) {
+    console.error('login error:', err);
+    return res.status(500).json({ error: 'Login failed' });
+  }
+}
+
+/**
+ * POST /api/auth/logout
+ */
+function logout(req, res) {
+  res.clearCookie('provn_access');
+  res.clearCookie('provn_refresh');
+  return res.json({ success: true });
+}
+
+/**
+ * POST /api/auth/refresh
+ * Uses refresh token cookie to issue a new access token.
+ */
+async function refresh(req, res) {
+  const token = req.cookies?.provn_refresh;
+  if (!token) {
+    return res.status(401).json({ error: 'No refresh token' });
+  }
+
+  try {
+    const payload = jwt.verify(token, REFRESH_SECRET);
+
+    const { rows } = await pool.query(
+      'SELECT id, role FROM users WHERE id = $1', [payload.userId]
+    );
+    if (!rows[0]) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    const { accessToken, refreshToken } = signTokens(rows[0].id, rows[0].role);
+    setTokenCookies(res, accessToken, refreshToken);
+
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired refresh token' });
+  }
+}
+
+/**
+ * GET /api/auth/me
+ */
+function me(req, res) {
+  return res.json({ data: req.user });
+}
+
+/**
+ * PUT /api/auth/profile
+ * Body: { name, branch, interests }  (interests as comma-separated string or array)
+ */
+async function updateProfile(req, res) {
+  const { name, branch, interests } = req.body;
+
+  const interestsArr = Array.isArray(interests)
+    ? interests
+    : (interests || '').split(',').map(s => s.trim()).filter(Boolean);
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE users
+       SET name = COALESCE($1, name),
+           branch = COALESCE($2, branch),
+           interests = $3,
+           updated_at = NOW()
+       WHERE id = $4
+       RETURNING id, email, name, role, branch, interests,
+                 current_roadmap_id, subscription_tier, company_name, avatar_url`,
+      [name || null, branch || null, interestsArr, req.user.id]
+    );
+    return res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('updateProfile error:', err);
+    return res.status(500).json({ error: 'Failed to update profile' });
+  }
+}
+
+/**
+ * PUT /api/auth/onboarding
+ * Body: { branch, interests, currentRoadmapId, orgName }
+ */
+async function updateOnboarding(req, res) {
+  const { branch, interests, currentRoadmapId, orgName } = req.body;
+
+  const interestsArr = Array.isArray(interests)
+    ? interests
+    : interests
+    ? interests.split(',').map(s => s.trim()).filter(Boolean)
+    : null;
+
+  try {
+    await pool.query(
+      `UPDATE users
+       SET branch             = COALESCE($1, branch),
+           interests          = COALESCE($2, interests),
+           current_roadmap_id = COALESCE($3, current_roadmap_id),
+           name               = CASE WHEN $4::TEXT IS NOT NULL THEN $4 ELSE name END,
+           updated_at         = NOW()
+       WHERE id = $5`,
+      [branch || null, interestsArr, currentRoadmapId || null, orgName || null, req.user.id]
+    );
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('updateOnboarding error:', err);
+    return res.status(500).json({ error: 'Failed to update onboarding' });
+  }
+}
+
+/**
+ * PUT /api/auth/upgrade
+ */
+async function upgradeToPro(req, res) {
+  try {
+    await pool.query(
+      `UPDATE users SET subscription_tier = 'pro', updated_at = NOW() WHERE id = $1`,
+      [req.user.id]
+    );
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('upgradeToPro error:', err);
+    return res.status(500).json({ error: 'Failed to upgrade' });
+  }
+}
+
+module.exports = { register, login, logout, refresh, me, updateProfile, updateOnboarding, upgradeToPro };
