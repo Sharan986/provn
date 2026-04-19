@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const requireAuth = require('../middleware/auth');
 const requireRole = require('../middleware/requireRole');
+const requirePro = require('../middleware/requirePro');
 const {
   getJobPostings,
   getJobPosting,

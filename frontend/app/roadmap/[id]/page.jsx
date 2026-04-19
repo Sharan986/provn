@@ -43,28 +43,29 @@ export default function RoadmapFlowPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const toast = useToast();
-  
+
   // Get refresh timestamp from URL (used to force refetch after simulator)
   const refreshKey = searchParams.get('t') || '';
-  
+
   const [loading, setLoading] = useState(true);
   const [roadmap, setRoadmap] = useState(null);
   const [skills, setSkills] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [progress, setProgress] = useState(null);
-  
+  const [isPro, setIsPro] = useState(true);
+
   // Side panel state
   const [selectedSkill, setSelectedSkill] = useState(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [submitUrl, setSubmitUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
-  
+
   // YouTube courses state
   const [youtubeVideos, setYoutubeVideos] = useState([]);
   const [loadingVideos, setLoadingVideos] = useState(false);
   const [activeTab, setActiveTab] = useState('tasks'); // 'tasks' | 'resources'
-  
+
   // Simulator/Assessment state
   const [simulatorChallenges, setSimulatorChallenges] = useState([]);
   const [simulatorProgress, setSimulatorProgress] = useState(null);
@@ -92,24 +93,27 @@ export default function RoadmapFlowPage() {
         if (roadmapRes?.data) {
           setRoadmap(roadmapRes.data.roadmap);
           setSkills(roadmapRes.data.skills || []);
+          if (roadmapRes.data.isPro !== undefined) setIsPro(roadmapRes.data.isPro);
+        } else if (roadmapRes?.error) {
+          toast.error(roadmapRes.error);
         }
-        
+
         if (tasksRes?.data) {
           setTasks(tasksRes.data);
         }
-        
+
         if (progressRes?.data) {
           setProgress(progressRes.data);
         }
-        
+
         if (challengesRes?.data) {
           setSimulatorChallenges(challengesRes.data);
         }
-        
+
         if (simProgressRes?.data) {
           setSimulatorProgress(simProgressRes.data);
         }
-        
+
         if (readinessRes?.data) {
           setReadinessScore(readinessRes.data);
         }
@@ -133,17 +137,17 @@ export default function RoadmapFlowPage() {
     const flowNodes = skills.map((skill, index) => ({
       id: skill.id,
       type: 'skill',
-      position: { 
-        x: skill.position_x || 250, 
-        y: skill.position_y || (100 + index * 120) 
+      position: {
+        x: skill.position_x || 250,
+        y: skill.position_y || (100 + index * 120)
       },
       data: {
         label: skill.name,
         description: skill.description,
-        status: completedSkills.includes(skill.id) 
-          ? 'completed' 
-          : inProgressSkills.includes(skill.id) 
-            ? 'in-progress' 
+        status: completedSkills.includes(skill.id)
+          ? 'completed'
+          : inProgressSkills.includes(skill.id)
+            ? 'in-progress'
             : 'pending',
         orderIndex: skill.order_index || index,
         onClick: () => handleNodeClick(skill)
@@ -157,7 +161,7 @@ export default function RoadmapFlowPage() {
       target: skills[index + 1].id,
       type: 'smoothstep',
       animated: !completedSkills.includes(skill.id),
-      style: { 
+      style: {
         stroke: completedSkills.includes(skill.id) ? '#84cc16' : '#000',
         strokeWidth: 3
       }
@@ -193,8 +197,8 @@ export default function RoadmapFlowPage() {
   const skillTasks = useMemo(() => {
     if (!selectedSkill || !tasks.length) return [];
     // Match tasks by skill_id or by order (fallback)
-    return tasks.filter(t => 
-      t.skill_id === selectedSkill.id || 
+    return tasks.filter(t =>
+      t.skill_id === selectedSkill.id ||
       (!t.skill_id && selectedSkill.order_index !== undefined)
     );
   }, [selectedSkill, tasks]);
@@ -208,11 +212,11 @@ export default function RoadmapFlowPage() {
   // Handle task submission
   const handleSubmit = async () => {
     if (!submitUrl || !selectedTask) return;
-    
+
     setSubmitting(true);
     try {
       const result = await submitTaskWork(selectedTask.id, submitUrl);
-      
+
       if (result.success) {
         toast.success('Task submitted successfully!');
         setSubmitUrl('');
@@ -235,8 +239,8 @@ export default function RoadmapFlowPage() {
   const diffColor = (d) => d === 'beginner' ? 'lime' : d === 'intermediate' ? 'yellow' : 'purple';
 
   // Calculate progress percentage
-  const progressPercent = progress?.totalPoints 
-    ? Math.round((progress.totalScore / progress.totalPoints) * 100) 
+  const progressPercent = progress?.totalPoints
+    ? Math.round((progress.totalScore / progress.totalPoints) * 100)
     : 0;
 
   // Count completed skills
@@ -305,7 +309,7 @@ export default function RoadmapFlowPage() {
                 <h1 className="heading-brutal text-xl sm:text-2xl">{roadmap.title}</h1>
               </div>
             </div>
-            
+
             {/* Right: Stats */}
             <div className="flex items-center gap-3 flex-wrap">
               {/* Skills Progress */}
@@ -316,14 +320,14 @@ export default function RoadmapFlowPage() {
                 </span>
                 <span className="font-mono text-xs text-muted">skills</span>
               </div>
-              
+
               {/* Tasks Count */}
               <div className="flex items-center gap-2 px-3 py-2 bg-bg border-2 border-black">
                 <Target size={16} className="text-cyan-500" />
                 <span className="font-mono text-sm font-bold">{tasks.length}</span>
                 <span className="font-mono text-xs text-muted">tasks</span>
               </div>
-              
+
               {/* Score Card */}
               <div className="flex items-center gap-3 px-4 py-2 bg-lime border-3 border-black shadow-brutal">
                 <div className="flex items-center gap-2">
@@ -345,11 +349,11 @@ export default function RoadmapFlowPage() {
               </div>
             </div>
           </div>
-          
+
           {/* Progress Bar */}
           <div className="mt-4">
             <div className="h-3 bg-bg-dark border-2 border-black overflow-hidden">
-              <div 
+              <div
                 className="h-full bg-lime transition-all duration-500 relative"
                 style={{ width: `${progressPercent}%` }}
               >
@@ -365,7 +369,7 @@ export default function RoadmapFlowPage() {
               <span className="font-mono text-[10px] text-muted">MASTERY</span>
             </div>
           </div>
-          
+
           {/* Industry Simulator Button - In Header */}
           <div className="mt-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -386,10 +390,14 @@ export default function RoadmapFlowPage() {
                 </div>
               )}
             </div>
-            
+
             <button
-              onClick={() => setShowAssessment(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple to-cyan-500 border-3 border-black shadow-brutal hover:shadow-brutal-lg hover:-translate-y-0.5 transition-all"
+              onClick={() => isPro ? setShowAssessment(true) : toast.error('Pro Feature: Upgrade to take tests')}
+              className={`flex items-center gap-2 px-4 py-2 border-3 border-black transition-all ${
+                isPro 
+                  ? 'bg-gradient-to-r from-purple to-cyan-500 shadow-brutal hover:shadow-brutal-lg hover:-translate-y-0.5' 
+                  : 'bg-bg-dark opacity-70 cursor-not-allowed'
+              }`}
             >
               <Brain size={18} className="text-white" />
               <span className="font-bold text-white text-sm">Industry Simulator</span>
@@ -417,11 +425,11 @@ export default function RoadmapFlowPage() {
             maxZoom={2}
           >
             <Background color="#d4d4d4" gap={24} size={2} />
-            <Controls 
+            <Controls
               className="border-3 border-black bg-white shadow-brutal"
               showInteractive={false}
             />
-            <MiniMap 
+            <MiniMap
               className="border-3 border-black bg-white shadow-brutal"
               nodeColor={(node) => {
                 if (node.data?.status === 'completed') return '#84cc16';
@@ -431,7 +439,7 @@ export default function RoadmapFlowPage() {
               maskColor="rgba(0,0,0,0.1)"
             />
           </ReactFlow>
-          
+
           {/* Empty state hint */}
           {skills.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -446,7 +454,7 @@ export default function RoadmapFlowPage() {
               </div>
             </div>
           )}
-          
+
           {/* Click hint */}
           {skills.length > 0 && !panelOpen && (
             <div className="absolute bottom-20 left-1/2 -translate-x-1/2 pointer-events-none">
@@ -491,7 +499,7 @@ export default function RoadmapFlowPage() {
                     <X size={20} />
                   </button>
                 </div>
-                
+
                 {/* Readiness Score Card */}
                 {readinessScore && (
                   <div className="mt-6 p-4 bg-bg border-3 border-black">
@@ -499,11 +507,10 @@ export default function RoadmapFlowPage() {
                       <div>
                         <div className="font-mono text-xs text-muted mb-1">YOUR READINESS SCORE</div>
                         <div className="flex items-center gap-3">
-                          <div className={`heading-brutal text-4xl ${
-                            readinessScore.score >= 80 ? 'text-lime-600' :
-                            readinessScore.score >= 60 ? 'text-yellow-500' :
-                            'text-red-500'
-                          }`}>
+                          <div className={`heading-brutal text-4xl ${readinessScore.score >= 80 ? 'text-lime-600' :
+                              readinessScore.score >= 60 ? 'text-yellow-500' :
+                                'text-red-500'
+                            }`}>
                             {readinessScore.score || 0}
                           </div>
                           <div className="font-mono text-sm text-muted">/100</div>
@@ -525,19 +532,18 @@ export default function RoadmapFlowPage() {
                       </div>
                     </div>
                     <div className="mt-3 h-2 bg-bg-dark border border-black">
-                      <div 
-                        className={`h-full transition-all duration-500 ${
-                          readinessScore.score >= 80 ? 'bg-lime' :
-                          readinessScore.score >= 60 ? 'bg-yellow-400' :
-                          'bg-red-400'
-                        }`}
+                      <div
+                        className={`h-full transition-all duration-500 ${readinessScore.score >= 80 ? 'bg-lime' :
+                            readinessScore.score >= 60 ? 'bg-yellow-400' :
+                              'bg-red-400'
+                          }`}
                         style={{ width: `${readinessScore.score || 0}%` }}
                       />
                     </div>
                   </div>
                 )}
               </div>
-              
+
               {/* Challenges Grid */}
               <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -546,7 +552,7 @@ export default function RoadmapFlowPage() {
                     {simulatorProgress?.completedCount || 0} / {simulatorChallenges.length} completed
                   </div>
                 </div>
-                
+
                 {simulatorChallenges.length === 0 ? (
                   <div className="text-center py-12 border-3 border-dashed border-black/20">
                     <Code size={48} className="mx-auto text-muted mb-4" />
@@ -561,9 +567,9 @@ export default function RoadmapFlowPage() {
                       const attempt = simulatorProgress?.attempts?.find(a => a.challenge_id === challenge.id);
                       const isCompleted = attempt?.passed;
                       const isPending = attempt && !attempt.passed;
-                      
+
                       return (
-                        <div 
+                        <div
                           key={challenge.id}
                           className={`
                             p-4 border-3 border-black transition-all
@@ -585,8 +591,8 @@ export default function RoadmapFlowPage() {
                               <div>
                                 <div className="flex items-center gap-2 mb-1">
                                   <h4 className="heading-brutal text-base">{challenge.title}</h4>
-                                  <Badge 
-                                    variant={challenge.difficulty === 'advanced' ? 'red' : challenge.difficulty === 'intermediate' ? 'orange' : 'lime'} 
+                                  <Badge
+                                    variant={challenge.difficulty === 'advanced' ? 'red' : challenge.difficulty === 'intermediate' ? 'orange' : 'lime'}
                                     size="xs"
                                   >
                                     {challenge.difficulty}
@@ -641,7 +647,7 @@ export default function RoadmapFlowPage() {
                     })}
                   </div>
                 )}
-                
+
                 {/* Info Box */}
                 <div className="mt-6 p-4 bg-purple/10 border-2 border-purple/30">
                   <div className="flex items-start gap-3">
@@ -694,14 +700,14 @@ export default function RoadmapFlowPage() {
                     <X size={16} />
                   </button>
                 </div>
-                
+
                 {/* Skill progress indicator */}
                 <div className="mt-4 flex items-center gap-3">
                   <div className="flex-1 h-2 bg-bg-dark border border-black overflow-hidden">
-                    <div 
+                    <div
                       className="h-full bg-purple transition-all"
-                      style={{ 
-                        width: `${skillTasks.length ? (skillTasks.filter(t => getTaskStatus(t.id)?.status === 'approved').length / skillTasks.length * 100) : 0}%` 
+                      style={{
+                        width: `${skillTasks.length ? (skillTasks.filter(t => getTaskStatus(t.id)?.status === 'approved').length / skillTasks.length * 100) : 0}%`
                       }}
                     />
                   </div>
@@ -710,30 +716,38 @@ export default function RoadmapFlowPage() {
                   </span>
                 </div>
               </div>
-              
+
               {/* Tab Navigation */}
               <div className="flex border-b-2 border-black">
                 <button
                   onClick={() => setActiveTab('tasks')}
-                  className={`flex-1 py-3 font-mono text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors ${
-                    activeTab === 'tasks' 
-                      ? 'bg-black text-white' 
+                  className={`flex-1 py-3 font-mono text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors ${activeTab === 'tasks'
+                      ? 'bg-black text-white'
                       : 'bg-white text-black hover:bg-bg-dark'
-                  }`}
+                    }`}
                 >
                   <Target size={14} />
                   Tasks ({skillTasks.length})
                 </button>
                 <button
                   onClick={() => setActiveTab('resources')}
-                  className={`flex-1 py-3 font-mono text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors border-l-2 border-black ${
-                    activeTab === 'resources' 
-                      ? 'bg-red-600 text-white' 
+                  className={`flex-1 py-3 font-mono text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors border-l-2 border-black ${activeTab === 'resources'
+                      ? 'bg-red-600 text-white'
                       : 'bg-white text-black hover:bg-bg-dark'
-                  }`}
+                    }`}
                 >
                   <Youtube size={14} />
                   Learn
+                </button>
+                <button
+                  onClick={() => setActiveTab('test')}
+                  className={`flex-1 py-3 font-mono text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors border-l-2 border-black ${activeTab === 'test'
+                      ? 'bg-purple text-white'
+                      : 'bg-white text-black hover:bg-bg-dark'
+                    }`}
+                >
+                  <Zap size={14} />
+                  Test
                 </button>
               </div>
 
@@ -747,16 +761,16 @@ export default function RoadmapFlowPage() {
                         {skillTasks.map(task => {
                           const submission = getTaskStatus(task.id);
                           const status = submission?.status;
-                          
+
                           return (
-                            <div 
-                              key={task.id} 
+                            <div
+                              key={task.id}
                               className={`
                                 p-4 border-3 border-black transition-all
-                                ${status === 'approved' 
-                                  ? 'bg-lime/20 shadow-brutal-lime' 
-                                  : status === 'pending' 
-                                    ? 'bg-yellow/20 shadow-brutal-yellow' 
+                                ${status === 'approved'
+                                  ? 'bg-lime/20 shadow-brutal-lime'
+                                  : status === 'pending'
+                                    ? 'bg-yellow/20 shadow-brutal-yellow'
                                     : 'bg-white shadow-brutal hover:shadow-brutal-lg hover:-translate-y-0.5'
                                 }
                               `}
@@ -788,12 +802,12 @@ export default function RoadmapFlowPage() {
                                   </div>
                                 )}
                               </div>
-                              
+
                               <h4 className="font-black text-sm uppercase mb-1">{task.title}</h4>
                               <p className="font-mono text-xs text-muted mb-3 leading-relaxed">
                                 {task.description}
                               </p>
-                              
+
                               {status === 'approved' ? (
                                 <div className="flex items-center justify-between bg-lime/30 border-2 border-lime px-3 py-2">
                                   <span className="font-mono text-xs font-bold flex items-center gap-2">
@@ -853,7 +867,7 @@ export default function RoadmapFlowPage() {
                       </div>
                     )}
                   </div>
-                ) : (
+                ) : activeTab === 'resources' ? (
                   /* YouTube Resources */
                   <div className="p-4">
                     {loadingVideos ? (
@@ -882,13 +896,13 @@ export default function RoadmapFlowPage() {
                                 ⭐ TOP PICK
                               </div>
                             )}
-                            
+
                             <div className="flex gap-3">
                               {/* Thumbnail */}
                               <div className="relative w-32 h-20 flex-shrink-0 bg-black border-2 border-black overflow-hidden">
                                 {video.thumbnail && (
-                                  <img 
-                                    src={video.thumbnail} 
+                                  <img
+                                    src={video.thumbnail}
                                     alt={video.title}
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                                   />
@@ -904,7 +918,7 @@ export default function RoadmapFlowPage() {
                                   </div>
                                 </div>
                               </div>
-                              
+
                               {/* Info */}
                               <div className="flex-1 min-w-0">
                                 <h5 className="font-bold text-xs uppercase leading-tight line-clamp-2 group-hover:text-red-600 transition-colors">
@@ -946,7 +960,7 @@ export default function RoadmapFlowPage() {
                         <p className="font-mono text-xs text-muted">
                           Try searching YouTube directly.
                         </p>
-                        <a 
+                        <a
                           href={`https://www.youtube.com/results?search_query=${encodeURIComponent(selectedSkill.name + ' tutorial')}`}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -959,7 +973,69 @@ export default function RoadmapFlowPage() {
                       </div>
                     )}
                   </div>
-                )}
+                ) : activeTab === 'test' ? (
+                  /* Test & Projects */
+                  <div className="p-4">
+                    {/* Best Score Card */}
+                    <div className="p-4 bg-bg border-3 border-black mb-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-black text-sm uppercase">Topic Test</h4>
+                      </div>
+                      <p className="font-mono text-xs text-muted mb-3">
+                        Take the test to unlock projects. 30 seconds per question.
+                      </p>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        fullWidth
+                        icon={Zap}
+                        iconPosition="right"
+                        onClick={() => {
+                          if (!isPro) {
+                            toast.error('Pro Feature: Upgrade to take tests');
+                          } else {
+                            toast.error('Test feature coming soon');
+                          }
+                        }}
+                        disabled={!isPro}
+                      >
+                        {!isPro ? 'Pro Only: Give Test' : 'Give Test'}
+                      </Button>
+                    </div>
+
+                    {/* Gated Projects */}
+                    <h4 className="font-black text-sm uppercase mb-3">GATED PROJECTS</h4>
+                    <div className="flex flex-col gap-3 relative">
+                      {/* Fake blurred projects */}
+                      {[
+                        { title: 'Personal Profile Card', desc: 'Create a fully responsive personal profile card using semantic HTML and flexbox.', req: 33, order: 1, color: 'lime' },
+                        { title: 'Responsive Landing Page', desc: 'Build a modern landing page for a SaaS product.', req: 66, order: 2, color: 'yellow' },
+                        { title: 'Interactive Dashboard', desc: 'Develop a complex dashboard with multiple grids and interactive elements.', req: 85, order: 3, color: 'purple' }
+                      ].map((proj) => (
+                        <div key={proj.order} className="p-4 border-3 border-black bg-bg-dark opacity-70 relative overflow-hidden blur-[2px] pointer-events-none">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant={proj.color} size="sm">Project {proj.order}</Badge>
+                            <Badge variant="default" size="sm">≥{proj.req}%</Badge>
+                          </div>
+                          <h5 className="font-black text-sm uppercase mb-1">{proj.title}</h5>
+                          <p className="font-mono text-[10px] text-muted mb-2">{proj.desc}</p>
+                        </div>
+                      ))}
+
+                      {/* Lock overlay */}
+                      <div className="absolute inset-0 bg-black/5 flex items-center justify-center z-10 pointer-events-none">
+                        <div className="text-center">
+                          <div className="w-10 h-10 mx-auto mb-2 bg-white border-2 border-black flex items-center justify-center rounded-full shadow-brutal-sm">
+                            <span className="text-lg">🔒</span>
+                          </div>
+                          <span className="font-mono text-[10px] font-bold bg-white px-2 py-1 border-2 border-black shadow-brutal-sm">
+                            Score high to unlock
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </>
           )}
@@ -995,13 +1071,13 @@ export default function RoadmapFlowPage() {
                   </button>
                 </div>
               </div>
-              
+
               {/* Modal Body */}
               <div className="p-4">
                 <p className="font-mono text-xs text-muted mb-4 leading-relaxed">
                   {selectedTask.description}
                 </p>
-                
+
                 <div className="mb-4 p-3 bg-bg border-2 border-black">
                   <h4 className="font-bold text-xs uppercase mb-2 flex items-center gap-2">
                     <CheckCircle size={12} /> Submission Guidelines
@@ -1012,7 +1088,7 @@ export default function RoadmapFlowPage() {
                     <li>• Include a README with instructions</li>
                   </ul>
                 </div>
-                
+
                 <Input
                   label="Project URL"
                   placeholder="https://github.com/you/project"
@@ -1020,7 +1096,7 @@ export default function RoadmapFlowPage() {
                   onChange={(e) => setSubmitUrl(e.target.value)}
                   icon={ExternalLink}
                 />
-                
+
                 <div className="flex gap-3 mt-6">
                   <Button
                     variant="outline"
@@ -1036,10 +1112,10 @@ export default function RoadmapFlowPage() {
                     variant="primary"
                     className="flex-1"
                     icon={submitting ? Loader2 : Send}
-                    onClick={handleSubmit}
-                    disabled={!submitUrl || submitting}
+                    onClick={() => isPro ? handleSubmit() : toast.error('Pro Feature: Upgrade to submit tasks')}
+                    disabled={(!submitUrl || submitting) && isPro}
                   >
-                    {submitting ? 'Submitting...' : 'Submit'}
+                    {!isPro ? 'Pro Only' : submitting ? 'Submitting...' : 'Submit'}
                   </Button>
                 </div>
               </div>

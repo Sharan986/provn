@@ -1,4 +1,4 @@
-// File: /home/sharan/Downloads/backend-check/frontend/app/layout.jsx
+// File: /run/media/suman990/New Volume/provendev/provn/frontend/app/layout.jsx
 import * as entry from '../../../app/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

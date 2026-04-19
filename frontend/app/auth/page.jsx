@@ -12,6 +12,9 @@ import Input from '@/components/Input';
 import Badge from '@/components/Badge';
 import { useToast } from '@/components/ToastContext';
 import { signUp, signIn } from '@/lib/actions/auth';
+import GoogleButton from '@/components/GoogleButton';
+
+
 
 const roles = [
   { id: 'student', label: 'Student', description: 'Build skills & get hired', icon: GraduationCap, color: 'lime' },
@@ -28,10 +31,12 @@ function AuthContent() {
   const mode = searchParams.get('mode') || 'login';
   const isRegister = mode === 'register';
 
-  const [step, setStep] = useState(isRegister ? 1 : 2);
+  const [step, setStep] = useState(2); // Start at step 2 (form)
   const [selectedRole, setSelectedRole] = useState('student');
+
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(searchParams.get('error') === 'google_failed' ? 'Google authentication failed' : '');
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -87,66 +92,29 @@ function AuthContent() {
           </p>
         </div>
 
-        {/* Step 1: Role Picker (Register only) */}
-        {isRegister && step === 1 && (
-          <div className="animate-fade-in-up">
-            <p className="label-brutal text-center mb-4">SELECT YOUR ROLE</p>
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              {roles.map((role) => {
-                const Icon = role.icon;
-                const isSelected = selectedRole === role.id;
-                return (
-                  <Card
-                    key={role.id}
-                    variant={isSelected ? role.color : 'default'}
-                    hoverable
-                    padding="sm"
-                    className={`text-center cursor-pointer transition-all ${
-                      isSelected ? 'ring-2 ring-black ring-offset-2' : ''
-                    }`}
-                    onClick={() => setSelectedRole(role.id)}
-                  >
-                    <Icon size={28} className="mx-auto mb-2" />
-                    <h3 className="font-black text-sm uppercase">{role.label}</h3>
-                    <p className="font-mono text-[10px] text-muted mt-1">{role.description}</p>
-                  </Card>
-                );
-              })}
-            </div>
-            <Button
-              variant="dark"
-              fullWidth
-              size="lg"
-              icon={ArrowRight}
-              iconPosition="right"
-              onClick={() => setStep(2)}
-            >
-              Continue as {roles.find(r => r.id === selectedRole)?.label}
-            </Button>
-          </div>
-        )}
 
-        {/* Step 2: Auth Form */}
-        {(step === 2 || !isRegister) && (
+
           <Card variant="default" padding="lg" className="animate-fade-in-up">
-            {isRegister && (
-              <button
-                onClick={() => setStep(1)}
-                className="flex items-center gap-1 font-mono text-xs font-bold uppercase mb-4 hover:text-lime transition-colors cursor-pointer"
-              >
-                <ArrowLeft size={14} />
-                Change Role
-              </button>
-            )}
+            <div className="mb-6">
+              <GoogleButton loading={loading} />
+              
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t-2 border-black/10"></div>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase font-mono">
+                  <span className="bg-white px-4 text-muted">Or continue with email</span>
+                </div>
+              </div>
+            </div>
 
             {isRegister && (
-              <div className="flex items-center gap-2 mb-6">
-                <Badge variant={roles.find(r => r.id === selectedRole)?.color}>
-                  {selectedRole}
-                </Badge>
-                <span className="font-mono text-xs text-muted">account</span>
+              <div className="flex items-center gap-2 mb-6 bg-lime/10 border-2 border-lime p-2">
+                <GraduationCap size={16} className="text-lime-700" />
+                <span className="font-mono text-xs text-lime-800 font-bold">Registering as a STUDENT</span>
               </div>
             )}
+
 
             {error && (
               <div className="bg-danger/10 border-2 border-danger text-danger px-4 py-3 mb-4 font-mono text-sm font-bold animate-shake">
@@ -203,7 +171,7 @@ function AuthContent() {
               </p>
             </div>
           </Card>
-        )}
+
       </div>
     </div>
   );

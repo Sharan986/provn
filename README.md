@@ -127,6 +127,7 @@ The REST API is built in Express and exposes endpoints under `/api`. All endpoin
 - `GET /me`: Get current authenticated user profile.
 - `PUT /profile`: Update profile info (name, branch, interests).
 - `PUT /onboarding`: Update onboarding details.
+- `PUT /upgrade`: Upgrade the current user to a Pro subscription.
 
 ### Roadmap Routes (`/api/roadmaps`)
 - `GET /`: List all available roadmaps.
@@ -143,7 +144,7 @@ The REST API is built in Express and exposes endpoints under `/api`. All endpoin
 - `GET /my-roadmap`: Get tasks specifically assigned to the user's roadmap.
 
 ### Submissions Routes (`/api/submissions`)
-- `POST /`: Submit task work (auto-triggers AI evaluation for platform tasks).
+- `POST /`: Submit task work (auto-triggers AI evaluation for platform tasks). **(Pro Feature)**
 - `GET /mine`: View your own submissions.
 - `GET /review`: View pending submissions (Industry only).
 - `PUT /:id/review`: Approve, reject or ask for revision.
@@ -152,7 +153,7 @@ The REST API is built in Express and exposes endpoints under `/api`. All endpoin
 ### Simulator Routes (`/api/simulator`)
 - `GET /challenges/:roadmapId`: List coding challenges.
 - `GET /challenge/:id`: Retrieve details & test cases for challenge execution.
-- `POST /attempts`: Start tracking a challenge attempt.
+- `POST /attempts`: Start tracking a challenge attempt. **(Pro Feature)**
 - `PUT /attempts/:id/submit`: Evaluate the submission code and score.
 - `GET /readiness/:roadmapId`: Get the compiled readiness score.
 - `GET /leaderboard/:roadmapId`: Top user scores on a roadmap.
@@ -163,7 +164,7 @@ The REST API is built in Express and exposes endpoints under `/api`. All endpoin
 - `GET /profile/:userId`: Detailed public performance profile.
 
 ### Marketplace Routes (`/api/marketplace`)
-- `GET /jobs` & `GET /tasks`: Find jobs & paid gig openings.
+- `GET /jobs` & `GET /tasks`: Find jobs & paid gig openings (Job listings are blurred for non-pro users).
 - `POST /jobs` & `POST /tasks`: Post new opportunities (Industry only).
 - `POST /apply`: Apply for an active opportunity.
 - `GET /applications/mine`: Check your application records.
@@ -176,7 +177,7 @@ The PostgreSQL schema integrates relationships across platform features.
 
 ### Core Tables
 
-- `users`: User profiles with roles (`student`, `industry`, `college`, `admin`). Auth features password hashing.
+- `users`: User profiles with roles (`student`, `industry`, `college`, `admin`) and `subscription_tier` (`free`, `pro`). Auth features password hashing.
 - `roadmaps`: Core learning paths (`title`, `description`, `curriculum`).
 - `skills`: Skills linked to `roadmap_id` providing node details for React Flow maps.
 - `tasks`: Actionable items attached to a roadmap or skill. Tracked by `points` and `difficulty`.
@@ -206,6 +207,18 @@ Provn uses native JWT (httpOnly cookies) with role-based access control evaluate
 | **Admin** | Full platform access. |
 
 Middleware automatically redirects users to their role-specific dashboards.
+
+---
+
+## 💎 Pro Features & Gating
+
+Provn includes a freemium model where certain high-value features are restricted to **Pro** users. 
+- **Skill-Gated Projects:** Normal users can view the project requirements, but they remain locked and blurred.
+- **Task Submissions:** Only Pro users can submit tasks for grading and review (`POST /api/submissions`).
+- **Industry Simulator:** The coding tests/simulator are disabled for free users (`POST /api/simulator/attempts`).
+- **Marketplace Jobs:** While all users can see the marketplace, job listings are beautifully blurred for non-pro users to incentivize upgrades.
+
+Access is controlled via the `requirePro` backend middleware and conditional `isPro` rendering on the frontend.
 
 ---
 

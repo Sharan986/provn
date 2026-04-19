@@ -40,6 +40,7 @@ export default function MarketplacePage() {
   const [jobs, setJobs] = useState([]);
   const [gigs, setGigs] = useState([]);
   const [roadmaps, setRoadmaps] = useState([]);
+  const [isPro, setIsPro] = useState(true);
   
   // Filters
   const [search, setSearch] = useState('');
@@ -56,7 +57,11 @@ export default function MarketplacePage() {
           getRoadmaps()
         ]);
         
-        if (jobsRes?.data) setJobs(jobsRes.data);
+        if (jobsRes?.data) {
+          setJobs(jobsRes.data);
+          if (jobsRes.isPro !== undefined) setIsPro(jobsRes.isPro);
+        }
+        
         if (gigsRes?.data) setGigs(gigsRes.data);
         if (roadmapsRes?.data) setRoadmaps(roadmapsRes.data);
       } catch (error) {
@@ -229,12 +234,30 @@ export default function MarketplacePage() {
 
       {/* Content */}
       {activeTab === 'jobs' ? (
-        <div className="space-y-4">
+        <div className="space-y-4 relative">
+          {!isPro && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[4px]">
+              <div className="bg-white border-3 border-black p-6 max-w-sm text-center shadow-brutal">
+                <div className="w-12 h-12 mx-auto bg-purple border-2 border-black flex items-center justify-center rounded-full mb-3">
+                  <Star size={20} className="text-white fill-white" />
+                </div>
+                <h3 className="font-black text-lg uppercase mb-2">Pro Feature</h3>
+                <p className="font-mono text-sm text-muted mb-4">
+                  Upgrade to Pro to view and apply to industry job opportunities.
+                </p>
+                <Link href="/pro">
+                  <Button variant="primary" fullWidth icon={Zap}>
+                    Upgrade to Pro
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
           {filteredJobs.length > 0 ? (
             filteredJobs.map(job => (
               <div
                 key={job.id}
-                className="group p-5 bg-white border-3 border-black shadow-brutal hover:shadow-brutal-lg hover:-translate-y-1 transition-all"
+                className={`group p-5 bg-white border-3 border-black shadow-brutal transition-all ${isPro ? 'hover:shadow-brutal-lg hover:-translate-y-1' : ''}`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                   {/* Company Logo Placeholder */}
