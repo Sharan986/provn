@@ -3,7 +3,7 @@
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  GraduationCap, Briefcase, Shield, Settings,
+  GraduationCap, Briefcase, Shield,
   ArrowRight, ArrowLeft, Mail, Lock, User, Zap
 } from 'lucide-react';
 import Button from '@/components/Button';
@@ -17,7 +17,6 @@ const roles = [
   { id: 'student', label: 'Student', description: 'Build skills & get hired', icon: GraduationCap, color: 'lime' },
   { id: 'industry', label: 'Industry', description: 'Post tasks & hire talent', icon: Briefcase, color: 'purple' },
   { id: 'college', label: 'College', description: 'Track student progress', icon: Shield, color: 'yellow' },
-  { id: 'admin', label: 'Admin', description: 'Manage the platform', icon: Settings, color: 'dark' },
 ];
 
 function AuthContent() {
@@ -91,7 +90,7 @@ function AuthContent() {
         {isRegister && step === 1 && (
           <div className="animate-fade-in-up">
             <p className="label-brutal text-center mb-4">SELECT YOUR ROLE</p>
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-3 gap-4 mb-6">
               {roles.map((role) => {
                 const Icon = role.icon;
                 const isSelected = selectedRole === role.id;
@@ -101,9 +100,8 @@ function AuthContent() {
                     variant={isSelected ? role.color : 'default'}
                     hoverable
                     padding="sm"
-                    className={`text-center cursor-pointer transition-all ${
-                      isSelected ? 'ring-2 ring-black ring-offset-2' : ''
-                    }`}
+                    className={`text-center cursor-pointer transition-all ${isSelected ? 'ring-2 ring-black ring-offset-2' : ''
+                      }`}
                     onClick={() => setSelectedRole(role.id)}
                   >
                     <Icon size={28} className="mx-auto mb-2" />
@@ -113,16 +111,35 @@ function AuthContent() {
                 );
               })}
             </div>
-            <Button
-              variant="dark"
-              fullWidth
-              size="lg"
-              icon={ArrowRight}
-              iconPosition="right"
-              onClick={() => setStep(2)}
-            >
-              Continue as {roles.find(r => r.id === selectedRole)?.label}
-            </Button>
+            {selectedRole === 'student' ? (
+              <Button
+                variant="dark"
+                fullWidth
+                size="lg"
+                icon={ArrowRight}
+                iconPosition="right"
+                onClick={() => setStep(2)}
+              >
+                Continue as Student
+              </Button>
+            ) : (
+              <Card variant={roles.find(r => r.id === selectedRole)?.color} padding="lg" className="text-center mt-2">
+                <Mail size={32} className="mx-auto mb-3" />
+                <h3 className="heading-brutal text-xl mb-2">CONTACT US</h3>
+                <p className="font-mono text-xs leading-relaxed mb-4">
+                  {selectedRole === 'industry'
+                    ? 'Interested in posting tasks and hiring talent through Provn?'
+                    : 'Want to track your students\' progress and boost placement rates?'}
+                  <br />
+                  Reach out to us and we'll get you set up.
+                </p>
+                <a href="mailto:hello@provn.live">
+                  <Button variant="dark" fullWidth size="lg" icon={Mail}>
+                    hello@provn.live
+                  </Button>
+                </a>
+              </Card>
+            )}
           </div>
         )}
 

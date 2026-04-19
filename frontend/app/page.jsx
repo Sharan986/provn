@@ -4,7 +4,8 @@ import Link from 'next/link';
 import {
   Zap, ArrowRight, ChevronRight, Rocket,
   Target, Trophy, Users, Star, Code,
-  Briefcase, GraduationCap, Shield, Sparkles, TrendingUp
+  Briefcase, GraduationCap, Shield, Sparkles, TrendingUp,
+  Crown, Check
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import Button from '@/components/Button';
@@ -284,6 +285,87 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ─── Pricing Preview ───────────────────── */}
+      <section id="pricing" className="py-16 sm:py-24 bg-bg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-12">
+            <Badge variant="purple" className="mb-4">
+              <Crown size={12} className="mr-1" /> PRICING
+            </Badge>
+            <h2 className="heading-brutal text-4xl sm:text-5xl lg:text-6xl mb-4">
+              ONE PLAN.
+              <br />
+              <span className="text-purple">EVERYTHING INCLUDED.</span>
+            </h2>
+            <p className="font-mono text-sm text-muted max-w-lg mx-auto">
+              No free tier, no feature gating. One subscription gets you the full Provn experience.
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-[1fr_380px] gap-8 items-center max-w-5xl mx-auto">
+            {/* Left — Highlights */}
+            <div>
+              <div className="grid sm:grid-cols-2 gap-4 mb-6">
+                {[
+                  { icon: Target, label: 'All career roadmaps', desc: 'Curated by industry experts' },
+                  { icon: Code, label: 'Unlimited tasks', desc: 'Real-world projects & challenges' },
+                  { icon: Zap, label: 'Industry Simulator', desc: 'Full advanced access' },
+                  { icon: Shield, label: 'Verified PRO badge', desc: 'Stand out to recruiters' },
+                  { icon: Trophy, label: 'Global leaderboard', desc: 'Compete & prove your skills' },
+                  { icon: Briefcase, label: 'Recruiter access', desc: 'Get hired directly' },
+                ].map((item, i) => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={i} className="flex items-start gap-3 p-3 bg-white border-brutal shadow-brutal-sm">
+                      <div className="w-8 h-8 bg-lime border-2 border-black flex items-center justify-center shrink-0">
+                        <Icon size={16} />
+                      </div>
+                      <div>
+                        <div className="font-mono text-xs font-bold uppercase">{item.label}</div>
+                        <div className="font-mono text-[11px] text-muted">{item.desc}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Right — Mini Pricing Card */}
+            <Card variant="purple" padding="lg" className="relative border-[3px] text-center">
+              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                <Badge variant="dark">
+                  <Star size={10} className="mr-1" /> ALL ACCESS
+                </Badge>
+              </div>
+              <h3 className="heading-brutal text-2xl mb-2 flex items-center justify-center gap-2 pt-2">
+                PRO <Crown size={24} />
+              </h3>
+              <div className="flex items-baseline justify-center gap-1 mb-2">
+                <span className="heading-brutal text-5xl">Rs xxx</span>
+                <span className="font-mono text-sm font-bold">/month</span>
+              </div>
+              <p className="font-mono text-xs mb-5 leading-relaxed">
+                Full platform access. No limits.
+                <br />Cancel anytime.
+              </p>
+              <div className="flex flex-col gap-2 text-left mb-6 bg-white/30 p-4 border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
+                {['All roadmaps & tasks', 'Advanced simulator', 'Priority code review', 'Recruiter visibility'].map((f, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Check size={14} strokeWidth={3} className="shrink-0" />
+                    <span className="font-mono text-xs font-bold">{f}</span>
+                  </div>
+                ))}
+              </div>
+              <Link href="/pricing">
+                <Button variant="dark" fullWidth size="lg" icon={ArrowRight} iconPosition="right">
+                  View Full Details
+                </Button>
+              </Link>
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* ─── CTA Section ──────────────────────── */}
       <section className="bg-black text-white py-16 sm:py-24">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
@@ -333,7 +415,7 @@ export default function LandingPage() {
               <div className="flex flex-col gap-2">
                 <span className="font-mono text-xs text-muted">About (Coming Soon)</span>
                 <span className="font-mono text-xs text-muted">Blog (Coming Soon)</span>
-                <Link href="/pro" className="font-mono text-xs hover:text-lime transition-colors">Pricing</Link>
+                <Link href="/pricing" className="font-mono text-xs hover:text-lime transition-colors">Pricing</Link>
                 <a href="mailto:hello@provn.live" className="font-mono text-xs hover:text-lime transition-colors">hello@provn.live</a>
                 <a href="mailto:support@provn.live" className="font-mono text-xs hover:text-lime transition-colors">support@provn.live</a>
               </div>

@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   Menu, X, Zap, LogOut, User, LayoutDashboard,
   Search, Compass, Trophy, Briefcase, GraduationCap,
-  Shield, Building2
+  Shield, Building2, Crown
 } from 'lucide-react';
 import Badge from './Badge';
 import Button from './Button';
@@ -63,6 +63,7 @@ export default function Navbar() {
     { href: '/discover', label: 'Discover', icon: Compass },
     { href: '/marketplace', label: 'Jobs', icon: Building2 },
     { href: '/simulator', label: 'Simulator', icon: Zap },
+    { href: '/pricing', label: 'Pricing', icon: Crown },
   ] : [];
 
   return (
@@ -107,7 +108,7 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-3">
             {isLoggedIn ? (
               <>
-                <Link href="/pro">
+                <Link href="/pricing">
                   <Badge variant="purple" size="sm">PRO</Badge>
                 </Link>
                 <button
@@ -122,6 +123,9 @@ export default function Navbar() {
               <>
                 {!isAuth && (
                   <>
+                    <Link href="/pricing">
+                      <Button variant="purple" size="sm" icon={Crown}>Pricing</Button>
+                    </Link>
                     <Link href="/auth?mode=login">
                       <Button variant="outline" size="sm">Log In</Button>
                     </Link>
