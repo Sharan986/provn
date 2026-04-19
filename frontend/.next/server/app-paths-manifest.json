@@ -1,0 +1,9 @@
+{
+  "/page": "app/page.js",
+  "/dashboard/student/page": "app/dashboard/student/page.js",
+  "/roadmap/[id]/page": "app/roadmap/[id]/page.js",
+  "/discover/page": "app/discover/page.js",
+  "/marketplace/page": "app/marketplace/page.js",
+  "/simulator/page": "app/simulator/page.js",
+  "/tasks/page": "app/tasks/page.js"
+}
