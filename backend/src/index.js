@@ -12,6 +12,7 @@ const submissionsRoutes = require('./routes/submissions');
 const simulatorRoutes = require('./routes/simulator');
 const marketplaceRoutes = require('./routes/marketplace');
 const scoresRoutes = require('./routes/scores');
+const skillTestsRoutes = require('./routes/skillTests');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -39,6 +40,7 @@ app.use('/api/submissions', submissionsRoutes);
 app.use('/api/simulator', simulatorRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/scores', scoresRoutes);
+app.use('/api/skills', skillTestsRoutes);
 
 // Health check
 app.get('/health', (_req, res) =>
