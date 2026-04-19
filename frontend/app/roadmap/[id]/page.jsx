@@ -31,6 +31,7 @@ import {
 } from '@/lib/actions/roadmapFlow';
 import { searchYouTubeCourses } from '@/lib/actions/youtube';
 import { getSimulatorChallenges, getSimulatorProgress, getReadinessScore } from '@/lib/actions/simulator';
+import { getBestSkillScore, getSkillProjects } from '@/lib/actions/skillTests';
 import SkillNode from '@/components/roadmap/SkillNode';
 
 // Node types for React Flow
@@ -64,7 +65,10 @@ export default function RoadmapFlowPage() {
   // YouTube courses state
   const [youtubeVideos, setYoutubeVideos] = useState([]);
   const [loadingVideos, setLoadingVideos] = useState(false);
-  const [activeTab, setActiveTab] = useState('tasks'); // 'tasks' | 'resources'
+  const [activeTab, setActiveTab] = useState('tasks'); // 'tasks' | 'resources' | 'test'
+
+  // Skill test & gated projects state
+  const [skillTestData, setSkillTestData] = useState({ bestPercentage: 0, projects: [], isPro: true, loading: false });
 
   // Simulator/Assessment state
   const [simulatorChallenges, setSimulatorChallenges] = useState([]);
@@ -974,67 +978,15 @@ export default function RoadmapFlowPage() {
                     )}
                   </div>
                 ) : activeTab === 'test' ? (
-                  /* Test & Projects */
-                  <div className="p-4">
-                    {/* Best Score Card */}
-                    <div className="p-4 bg-bg border-3 border-black mb-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-black text-sm uppercase">Topic Test</h4>
-                      </div>
-                      <p className="font-mono text-xs text-muted mb-3">
-                        Take the test to unlock projects. 30 seconds per question.
-                      </p>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        fullWidth
-                        icon={Zap}
-                        iconPosition="right"
-                        onClick={() => {
-                          if (!isPro) {
-                            toast.error('Pro Feature: Upgrade to take tests');
-                          } else {
-                            toast.error('Test feature coming soon');
-                          }
-                        }}
-                        disabled={!isPro}
-                      >
-                        {!isPro ? 'Pro Only: Give Test' : 'Give Test'}
-                      </Button>
-                    </div>
-
-                    {/* Gated Projects */}
-                    <h4 className="font-black text-sm uppercase mb-3">GATED PROJECTS</h4>
-                    <div className="flex flex-col gap-3 relative">
-                      {/* Fake blurred projects */}
-                      {[
-                        { title: 'Personal Profile Card', desc: 'Create a fully responsive personal profile card using semantic HTML and flexbox.', req: 33, order: 1, color: 'lime' },
-                        { title: 'Responsive Landing Page', desc: 'Build a modern landing page for a SaaS product.', req: 66, order: 2, color: 'yellow' },
-                        { title: 'Interactive Dashboard', desc: 'Develop a complex dashboard with multiple grids and interactive elements.', req: 85, order: 3, color: 'purple' }
-                      ].map((proj) => (
-                        <div key={proj.order} className="p-4 border-3 border-black bg-bg-dark opacity-70 relative overflow-hidden blur-[2px] pointer-events-none">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Badge variant={proj.color} size="sm">Project {proj.order}</Badge>
-                            <Badge variant="default" size="sm">≥{proj.req}%</Badge>
-                          </div>
-                          <h5 className="font-black text-sm uppercase mb-1">{proj.title}</h5>
-                          <p className="font-mono text-[10px] text-muted mb-2">{proj.desc}</p>
-                        </div>
-                      ))}
-
-                      {/* Lock overlay */}
-                      <div className="absolute inset-0 bg-black/5 flex items-center justify-center z-10 pointer-events-none">
-                        <div className="text-center">
-                          <div className="w-10 h-10 mx-auto mb-2 bg-white border-2 border-black flex items-center justify-center rounded-full shadow-brutal-sm">
-                            <span className="text-lg">🔒</span>
-                          </div>
-                          <span className="font-mono text-[10px] font-bold bg-white px-2 py-1 border-2 border-black shadow-brutal-sm">
-                            Score high to unlock
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  /* Test & Gated Projects */
+                  <TestTabContent
+                    selectedSkill={selectedSkill}
+                    isPro={isPro}
+                    router={router}
+                    toast={toast}
+                    skillTestData={skillTestData}
+                    setSkillTestData={setSkillTestData}
+                  />
                 ) : null}
               </div>
             </>
@@ -1123,6 +1075,219 @@ export default function RoadmapFlowPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── TestTabContent ─────────────────────────────────────────────────────────
+// Extracted component for the Test & Projects tab inside the skill side panel.
+function TestTabContent({ selectedSkill, isPro, router, toast, skillTestData, setSkillTestData }) {
+  const [loading, setLoading] = useState(false);
+
+  // Fetch test data when component mounts or skill changes
+  useEffect(() => {
+    if (!selectedSkill?.id) return;
+
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const [bestRes, projRes] = await Promise.all([
+          getBestSkillScore(selectedSkill.id),
+          getSkillProjects(selectedSkill.id),
+        ]);
+
+        if (cancelled) return;
+
+        setSkillTestData({
+          bestPercentage: bestRes?.data?.bestPercentage || 0,
+          attemptCount: bestRes?.data?.attemptCount || 0,
+          projects: projRes?.data?.projects || [],
+          isPro: projRes?.data?.isPro !== undefined ? projRes.data.isPro : isPro,
+          loading: false,
+        });
+      } catch (err) {
+        console.error('Failed to load skill test data:', err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [selectedSkill?.id]);
+
+  const { bestPercentage, attemptCount, projects } = skillTestData;
+  const diffColor = (d) => ({ beginner: 'lime', intermediate: 'orange', advanced: 'red' }[d] || 'default');
+
+  if (loading) {
+    return (
+      <div className="p-4 flex items-center justify-center py-12">
+        <Loader2 size={24} className="animate-spin text-purple" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4">
+      {/* Best Score Card */}
+      <div className="p-4 bg-bg border-3 border-black mb-4">
+        <div className="flex items-center justify-between mb-1">
+          <h4 className="font-black text-sm uppercase">Topic Test</h4>
+          {attemptCount > 0 && (
+            <Badge variant="purple" size="sm">{attemptCount} attempt{attemptCount !== 1 ? 's' : ''}</Badge>
+          )}
+        </div>
+
+        {bestPercentage > 0 ? (
+          <div className="my-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-mono text-xs text-muted">Best Score</span>
+              <span className="font-mono text-sm font-bold text-purple">{bestPercentage}%</span>
+            </div>
+            <div className="h-3 bg-white border-2 border-black overflow-hidden">
+              <div
+                className="h-full bg-purple transition-all"
+                style={{ width: `${bestPercentage}%` }}
+              />
+            </div>
+            {/* Threshold markers */}
+            <div className="flex justify-between mt-1">
+              {[33, 66, 85].map(t => (
+                <span key={t} className={`font-mono text-[9px] font-bold ${bestPercentage >= t ? 'text-green-600' : 'text-muted'}`}>
+                  {bestPercentage >= t ? '✓' : ''}{t}%
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="font-mono text-xs text-muted my-3">
+            Take the test to unlock projects. 30 seconds per question.
+          </p>
+        )}
+
+        <Button
+          variant="primary"
+          size="sm"
+          fullWidth
+          icon={Zap}
+          iconPosition="right"
+          onClick={() => {
+            if (!isPro) {
+              toast.error('Pro Feature: Upgrade to take tests');
+            } else {
+              router.push(`/skill-test/${selectedSkill.id}`);
+            }
+          }}
+          disabled={!isPro}
+        >
+          {!isPro ? 'Pro Only: Give Test' : bestPercentage > 0 ? 'Retake Test' : 'Give Test'}
+        </Button>
+      </div>
+
+      {/* Gated Projects */}
+      <h4 className="font-black text-sm uppercase mb-3">GATED PROJECTS</h4>
+
+      {projects.length > 0 ? (
+        <div className="flex flex-col gap-3">
+          {projects.map((proj) => {
+            const isUnlocked = proj.isUnlocked;
+            return (
+              <div
+                key={proj.id}
+                className={`p-4 border-3 border-black transition-all relative overflow-hidden ${
+                  isUnlocked
+                    ? 'bg-white shadow-brutal hover:shadow-brutal-lg hover:-translate-y-0.5'
+                    : 'bg-bg-dark opacity-60 blur-[1.5px]'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant={diffColor(proj.difficulty)} size="sm">
+                    Project {proj.project_order}
+                  </Badge>
+                  <Badge variant={isUnlocked ? 'lime' : 'default'} size="sm">
+                    {isUnlocked ? '🔓 Unlocked' : `🔒 ≥${proj.unlock_threshold}%`}
+                  </Badge>
+                  <span className="ml-auto font-mono text-[10px] font-bold text-muted">
+                    {proj.points} pts
+                  </span>
+                </div>
+                <h5 className="font-black text-sm uppercase mb-1">{proj.title}</h5>
+                <p className="font-mono text-[10px] text-muted mb-2 leading-relaxed">{proj.description}</p>
+
+                {isUnlocked && (
+                  <div className="mt-2">
+                    {proj.submission?.status === 'approved' ? (
+                      <div className="flex items-center gap-2 bg-lime/30 border-2 border-lime px-3 py-2">
+                        <CheckCircle size={12} />
+                        <span className="font-mono text-xs font-bold">Completed</span>
+                      </div>
+                    ) : proj.submission?.status === 'pending' ? (
+                      <div className="flex items-center gap-2 bg-yellow/30 border-2 border-yellow px-3 py-2">
+                        <Loader2 size={12} className="animate-spin" />
+                        <span className="font-mono text-xs font-bold">Under Review</span>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        fullWidth
+                        icon={Send}
+                        onClick={() => {
+                          if (!isPro) {
+                            toast.error('Pro Feature: Upgrade to submit projects');
+                          } else {
+                            toast.info('Project submission coming soon!');
+                          }
+                        }}
+                        disabled={!isPro}
+                      >
+                        Submit Project
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {/* Lock overlay for locked projects */}
+                {!isUnlocked && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="text-center">
+                      <span className="text-2xl">🔒</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Fallback placeholder projects when none exist in DB yet */
+        <div className="flex flex-col gap-3 relative">
+          {[
+            { title: 'Beginner Project', req: 33, order: 1, color: 'lime' },
+            { title: 'Intermediate Project', req: 66, order: 2, color: 'yellow' },
+            { title: 'Advanced Project', req: 85, order: 3, color: 'purple' },
+          ].map((proj) => (
+            <div key={proj.order} className="p-4 border-3 border-black bg-bg-dark opacity-60 blur-[1.5px] pointer-events-none">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant={proj.color} size="sm">Project {proj.order}</Badge>
+                <Badge variant="default" size="sm">≥{proj.req}%</Badge>
+              </div>
+              <h5 className="font-black text-sm uppercase mb-1">{proj.title}</h5>
+              <p className="font-mono text-[10px] text-muted">Take the test first to see project details.</p>
+            </div>
+          ))}
+          <div className="absolute inset-0 bg-black/5 flex items-center justify-center z-10 pointer-events-none">
+            <div className="text-center">
+              <div className="w-10 h-10 mx-auto mb-2 bg-white border-2 border-black flex items-center justify-center rounded-full shadow-brutal-sm">
+                <span className="text-lg">🔒</span>
+              </div>
+              <span className="font-mono text-[10px] font-bold bg-white px-2 py-1 border-2 border-black shadow-brutal-sm">
+                Score high to unlock
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

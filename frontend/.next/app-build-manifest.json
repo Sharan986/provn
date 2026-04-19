@@ -11,6 +11,11 @@
       "static/chunks/main-app.js",
       "static/chunks/app/page.js"
     ],
+    "/auth/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/auth/page.js"
+    ],
     "/dashboard/student/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -22,20 +27,20 @@
       "static/css/app/roadmap/[id]/page.css",
       "static/chunks/app/roadmap/[id]/page.js"
     ],
-    "/discover/page": [
+    "/skill-test/[skillId]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/discover/page.js"
+      "static/chunks/app/skill-test/[skillId]/page.js"
     ],
     "/marketplace/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/marketplace/page.js"
     ],
-    "/simulator/page": [
+    "/discover/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/simulator/page.js"
+      "static/chunks/app/discover/page.js"
     ],
     "/tasks/page": [
       "static/chunks/webpack.js",
