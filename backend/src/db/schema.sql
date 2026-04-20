@@ -32,6 +32,9 @@ CREATE TABLE IF NOT EXISTS users (
   subscription_tier   TEXT        CHECK (subscription_tier IN ('free','pro')) DEFAULT 'free',
   company_name        TEXT,
   avatar_url          TEXT,
+  github_id           TEXT        UNIQUE,
+  github_username     TEXT,
+  github_access_token TEXT,
   created_at          TIMESTAMPTZ DEFAULT NOW(),
   updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
@@ -66,6 +69,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   auto_review_enabled   BOOLEAN DEFAULT TRUE,
   requirements          JSONB,
   test_criteria         JSONB,
+  template_repo_url     TEXT,
   created_at            TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -83,6 +87,7 @@ CREATE TABLE IF NOT EXISTS submissions (
   reviewed_by    TEXT,
   review_details JSONB,
   reviewed_at    TIMESTAMPTZ,
+  github_repo_url TEXT,
   created_at     TIMESTAMPTZ DEFAULT NOW()
 );
 

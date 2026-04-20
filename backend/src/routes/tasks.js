@@ -7,11 +7,13 @@ const {
   getMyRoadmapTasks,
   getTasksBySkill,
   createTask,
+  provisionTaskRepo,
 } = require('../controllers/tasksController');
 
 router.get('/my-roadmap',      requireAuth, getMyRoadmapTasks);
 router.get('/skill/:skillId',  requireAuth, getTasksBySkill);
 router.get('/',                requireAuth, getAllTasks);
 router.post('/',               requireAuth, requireRole('industry', 'admin'), createTask);
+router.post('/:taskId/provision', requireAuth, provisionTaskRepo);
 
 module.exports = router;

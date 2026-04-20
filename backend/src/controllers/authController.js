@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../db/pool');
 const { OAuth2Client } = require('google-auth-library');
+const githubService = require('../services/githubService');
 
 const client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
@@ -16,8 +17,8 @@ const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'provn_refresh_super_se
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function signTokens(userId, role) {
-  const accessToken  = jwt.sign({ userId, role }, ACCESS_SECRET,  { expiresIn: '15m' });
-  const refreshToken = jwt.sign({ userId },       REFRESH_SECRET, { expiresIn: '7d'  });
+  const accessToken  = jwt.sign({ userId, role }, ACCESS_SECRET,  { expiresIn: '7d' });
+  const refreshToken = jwt.sign({ userId },       REFRESH_SECRET, { expiresIn: '7d' });
   return { accessToken, refreshToken };
 }
 
@@ -28,7 +29,7 @@ function setTokenCookies(res, accessToken, refreshToken) {
     httpOnly: true,
     secure:   isProd,
     sameSite: 'lax',
-    maxAge:   15 * 60 * 1000,           // 15 minutes
+    maxAge:   7 * 24 * 60 * 60 * 1000, // 7 days
   });
 
   res.cookie('provn_refresh', refreshToken, {
@@ -322,9 +323,55 @@ async function googleCallback(req, res) {
   }
 }
 
+/**
+ * GET /api/auth/github
+ */
+function githubAuth(req, res) {
+  // Pass user id in state to be safe
+  const state = req.user.id;
+  const url = githubService.getGithubAuthUrl(state);
+  res.redirect(url);
+}
+
+/**
+ * GET /api/auth/github/callback
+ */
+async function githubCallback(req, res) {
+  const { code, state } = req.query;
+  const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+  
+  try {
+    const userId = state || req.user?.id;
+    if (!userId) {
+      return res.redirect(`${FRONTEND_URL}/auth?error=unauthorized`);
+    }
+
+    const tokenData = await githubService.getGithubAccessToken(code);
+    const accessToken = tokenData.access_token;
+    
+    if (!accessToken) {
+      throw new Error('No access token received from GitHub');
+    }
+
+    const githubUser = await githubService.getGithubUserProfile(accessToken);
+
+    await pool.query(
+      `UPDATE users 
+       SET github_id = $1, github_username = $2, github_access_token = $3, updated_at = NOW() 
+       WHERE id = $4`,
+      [githubUser.id.toString(), githubUser.login, accessToken, userId]
+    );
+
+    return res.redirect(`${FRONTEND_URL}/dashboard/student?success=github_linked`);
+  } catch (err) {
+    console.error('githubCallback error:', err);
+    return res.redirect(`${FRONTEND_URL}/dashboard/student?error=github_failed`);
+  }
+}
+
 module.exports = {
   register, login, logout, refresh, me,
   updateProfile, updateOnboarding, upgradeToPro,
-  googleAuth, googleCallback
+  googleAuth, googleCallback, githubAuth, githubCallback
 };
 

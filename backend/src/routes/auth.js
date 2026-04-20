@@ -12,6 +12,8 @@ const {
   upgradeToPro,
   googleAuth,
   googleCallback,
+  githubAuth,
+  githubCallback,
 } = require('../controllers/authController');
 
 router.post('/register',    register);
@@ -25,6 +27,7 @@ router.put('/upgrade',      requireAuth, upgradeToPro);
 
 router.get('/google',          googleAuth);
 router.get('/google/callback', googleCallback);
-
+router.get('/github',          requireAuth, githubAuth);
+router.get('/github/callback', githubCallback);
 
 module.exports = router;

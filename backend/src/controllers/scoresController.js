@@ -10,7 +10,7 @@ async function getDashboardStats(req, res) {
   try {
     if (role === 'student') {
       const { rows: submissionRows } = await pool.query(
-        `SELECT status, score FROM submissions WHERE student_id = $1`, [userId]
+        `SELECT status, score, created_at FROM submissions WHERE student_id = $1`, [userId]
       );
       const completed   = submissionRows.filter(s => s.status === 'approved');
       const pending     = submissionRows.filter(s => s.status === 'pending');
@@ -18,12 +18,37 @@ async function getDashboardStats(req, res) {
 
       const { rows: countRows } = await pool.query('SELECT COUNT(*)::INT AS cnt FROM tasks');
 
+      // Fetch activity data (last 7 days)
+      const { rows: activityRows } = await pool.query(
+        `SELECT to_char(created_at, 'Dy') as day, SUM(score)::INT as pts
+         FROM submissions
+         WHERE student_id = $1 AND status = 'approved' AND created_at >= NOW() - INTERVAL '7 days'
+         GROUP BY day, DATE(created_at)
+         ORDER BY DATE(created_at) ASC`,
+        [userId]
+      );
+
+      // Fetch radar data (top 5 skills by score)
+      const { rows: radarRows } = await pool.query(
+        `SELECT sk.name as subject, SUM(s.score)::INT as value
+         FROM submissions s
+         JOIN tasks t ON s.task_id = t.id
+         JOIN skills sk ON t.skill_id = sk.id
+         WHERE s.student_id = $1 AND s.status = 'approved'
+         GROUP BY sk.name
+         ORDER BY value DESC
+         LIMIT 5`,
+        [userId]
+      );
+
       return res.json({
         data: {
           totalScore,
           tasksCompleted:  completed.length,
           tasksPending:    pending.length,
           tasksAvailable:  countRows[0].cnt,
+          activityData:    activityRows,
+          radarData:       radarRows.map(r => ({ ...r, fullMark: 100 })), // Max points scale, could be dynamic
         },
       });
     }

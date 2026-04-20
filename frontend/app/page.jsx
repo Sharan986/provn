@@ -494,8 +494,8 @@ export default function LandingPage() {
       {/* ─── Footer ───────────────────────────── */}
       <footer className="bg-white border-t-4 border-black">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
-          <div className="grid sm:grid-cols-4 gap-8">
-            <div>
+          <div className="grid sm:grid-cols-5 gap-8">
+            <div className="sm:col-span-1">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-8 h-8 bg-lime border-2 border-black flex items-center justify-center">
                   <Zap size={16} />
@@ -531,6 +531,13 @@ export default function LandingPage() {
               <div className="flex flex-col gap-2">
                 <Link href="/privacy" className="font-mono text-xs hover:text-lime transition-colors">Privacy Policy</Link>
                 <Link href="/terms" className="font-mono text-xs hover:text-lime transition-colors">Terms of Service</Link>
+              </div>
+            </div>
+            <div>
+              <h4 className="label-brutal mb-3">SOCIALS</h4>
+              <div className="flex flex-col gap-2">
+                <a href="https://instagram.provn.live" target="_blank" rel="noopener noreferrer" className="font-mono text-xs hover:text-lime transition-colors">Instagram</a>
+                <a href="https://linkedin.provn.live" target="_blank" rel="noopener noreferrer" className="font-mono text-xs hover:text-lime transition-colors">LinkedIn</a>
               </div>
             </div>
           </div>
