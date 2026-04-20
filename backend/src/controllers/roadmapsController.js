@@ -89,7 +89,16 @@ async function getRoadmapWithSkills(req, res) {
       usingFallback = true;
     }
 
-    return res.json({ data: { roadmap: roadmapRows[0], skills, usingFallback } });
+    const isPro = req.user.subscription_tier === 'pro' || req.user.role === 'admin';
+
+    return res.json({
+      data: {
+        roadmap: roadmapRows[0],
+        skills,
+        usingFallback,
+        isPro
+      }
+    });
   } catch (err) {
     console.error('getRoadmapWithSkills error:', err);
     return res.status(500).json({ error: 'Failed to fetch roadmap skills' });
@@ -172,8 +181,75 @@ async function getRoadmapsWithSkillCounts(req, res) {
   }
 }
 
+/**
+ * POST /api/roadmaps
+ * Admin only: Create a new roadmap.
+ */
+async function createRoadmap(req, res) {
+  const { title, description, curriculum } = req.body;
+  if (!title) return res.status(400).json({ error: 'Roadmap title is required' });
+
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO roadmaps (title, description, curriculum)
+       VALUES ($1, $2, $3) RETURNING *`,
+      [title, description || '', curriculum ? JSON.stringify(curriculum) : '[]']
+    );
+    return res.status(201).json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('createRoadmap error:', err);
+    return res.status(500).json({ error: 'Failed to create roadmap' });
+  }
+}
+
+/**
+ * PUT /api/roadmaps/:id
+ * Admin only: Update an existing roadmap.
+ */
+async function updateRoadmap(req, res) {
+  const { id } = req.params;
+  const { title, description, curriculum } = req.body;
+
+  try {
+    const { rows: check } = await pool.query('SELECT id FROM roadmaps WHERE id = $1', [id]);
+    if (!check[0]) return res.status(404).json({ error: 'Roadmap not found' });
+
+    const { rows } = await pool.query(
+      `UPDATE roadmaps
+       SET title = COALESCE($1, title),
+           description = COALESCE($2, description),
+           curriculum = COALESCE($3, curriculum)
+       WHERE id = $4 RETURNING *`,
+      [title, description, curriculum ? JSON.stringify(curriculum) : null, id]
+    );
+    return res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('updateRoadmap error:', err);
+    return res.status(500).json({ error: 'Failed to update roadmap' });
+  }
+}
+
+/**
+ * DELETE /api/roadmaps/:id
+ * Admin only: Delete a roadmap.
+ */
+async function deleteRoadmap(req, res) {
+  const { id } = req.params;
+
+  try {
+    const { rowCount } = await pool.query('DELETE FROM roadmaps WHERE id = $1', [id]);
+    if (rowCount === 0) return res.status(404).json({ error: 'Roadmap not found' });
+    return res.json({ success: true, message: 'Roadmap deleted' });
+  } catch (err) {
+    console.error('deleteRoadmap error:', err);
+    return res.status(500).json({ error: 'Failed to delete roadmap' });
+  }
+}
+
 module.exports = {
   createSkill,
   getAllRoadmaps, getRoadmap, getRoadmapWithSkills,
   getTasksByRoadmap, assignRoadmap, getMyRoadmap, getRoadmapsWithSkillCounts,
+  createRoadmap, updateRoadmap, deleteRoadmap,
 };
+

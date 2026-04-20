@@ -27,7 +27,8 @@ async function getJobPostings(req, res) {
        ORDER BY jp.created_at DESC`,
       params
     );
-    return res.json({ data: rows });
+    const isPro = req.user.subscription_tier === 'pro' || req.user.role === 'admin';
+    return res.json({ data: rows, isPro });
   } catch (err) {
     console.error('getJobPostings error:', err);
     return res.status(500).json({ error: 'Failed to fetch job postings' });
