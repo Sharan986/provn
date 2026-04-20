@@ -12,19 +12,37 @@ const inter = Inter({
 
 export const metadata = {
   metadataBase: siteUrl,
-  title: 'Provn — Campus to Careers',
-  description: 'The career readiness platform that bridges the gap between campus learning and industry hiring. Build real skills, complete projects, get hired.',
-  keywords: ['career readiness', 'campus to careers', 'internships', 'jobs', 'skills', 'portfolio'],
+  title: {
+    default: 'Provn | The Student-to-Career Tech Platform',
+    template: '%s | Provn',
+  },
+  description: 'Provn is the premier technical career readiness platform. We bridge the gap between campus learning and tech industry hiring. Master coding roadmaps, build real-world developer skills, and get hired directly by tech companies on Provn.',
+  keywords: ['Provn', 'provn.live', 'tech career readiness', 'software engineering roadmaps', 'campus to careers', 'developer internships', 'tech jobs', 'coding skills', 'developer portfolio', 'tech hiring platform', 'provn platform'],
   openGraph: {
-    title: 'Provn — Campus to Careers',
-    description: 'Build real skills. Complete projects. Get hired.',
+    title: 'Provn | The Student-to-Career Tech Platform',
+    description: 'Master coding roadmaps, build real-world developer skills, and get hired directly by top tech companies on Provn.',
     type: 'website',
     url: siteUrl,
+    siteName: 'Provn',
   },
   twitter: {
-    card: 'summary',
-    title: 'Provn — Campus to Careers',
-    description: 'Build real skills. Complete projects. Get hired.',
+    card: 'summary_large_image',
+    title: 'Provn | Tech Campus to Careers',
+    description: 'Master coding roadmaps, build real-world developer skills, and get hired on Provn.',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  alternates: {
+    canonical: siteUrl,
   },
 };
 

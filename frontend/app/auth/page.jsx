@@ -227,7 +227,7 @@ function AuthContent() {
               </p>
             </div>
           </Card>
-
+        )}
       </div>
     </div>
   );

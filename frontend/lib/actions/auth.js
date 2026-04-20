@@ -82,7 +82,7 @@ export async function signOut() {
 
 export async function getCurrentUser() {
   // We can fetch from /api/auth/me but it's simpler if the backend just resolves user inside apiFetch
-  const { data, error } = await apiFetch('/auth/me', { method: 'GET' });
+  const { data, error } = await apiFetch('/auth/me', { method: 'GET', cache: 'no-store' });
   if (error || !data || data.error) return null;
 
   // Expected: { data: userObject }

@@ -1,11 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   Zap, ArrowRight, ChevronRight, Rocket,
   Target, Trophy, Users, Star, Code,
   Briefcase, GraduationCap, Shield, Sparkles, TrendingUp,
-  Crown, Check
+  Crown, Check, ChevronDown
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import Button from '@/components/Button';
@@ -22,22 +23,22 @@ const marqueeWords = [
 const steps = [
   {
     num: '01',
-    title: 'Choose a Path',
-    description: 'Explore curated roadmaps designed by industry experts. Pick the career trajectory that excites you.',
+    title: 'Choose a Tech Roadmap',
+    description: 'Explore curated software engineering roadmaps designed by industry experts. Pick the tech career trajectory that excites you.',
     icon: Target,
     color: 'lime',
   },
   {
     num: '02',
-    title: 'Build Projects',
-    description: 'Complete real-world tasks and challenges. Build a portfolio that speaks louder than any resume.',
+    title: 'Build Developer Portfolios',
+    description: 'Complete real-world coding tasks and challenges. Build a verifiable developer portfolio that speaks louder than any resume.',
     icon: Code,
     color: 'purple',
   },
   {
     num: '03',
-    title: 'Get Hired',
-    description: 'Industry partners review your work directly. Skip the queue — your skills are your ticket.',
+    title: 'Get Hired in Tech',
+    description: 'Tech recruiters and industry partners review your code directly. Skip the queue — your engineering skills are your ticket.',
     icon: Trophy,
     color: 'yellow',
   },
@@ -58,6 +59,49 @@ const trendingSkillsData = [
   { name: 'Full-Stack (Next.js)', growth: 55, color: '#ef4444' },
 ];
 
+const landingFaqs = [
+  {
+    q: 'What is Provn and how does it help my tech career?',
+    a: 'Provn is a premier tech career readiness platform that bridges the gap between campus learning and industry hiring. We provide curated software engineering roadmaps where you build real-world developer skills through hands-on tasks, making you highly competitive for tech jobs.',
+  },
+  {
+    q: 'Are the coding roadmaps and developer tasks free?',
+    a: 'Yes! Anyone can sign up for free and start accessing our developer roadmaps and basic platform tasks to build their portfolio.',
+  },
+  {
+    q: 'How do tech recruiters hire from Provn?',
+    a: 'Industry partners and recruiters use Provn to discover talent based on verified skill portfolios and Readiness Scores. When you complete tasks and simulator challenges, your work speaks for itself, allowing top tech companies to hire you directly.',
+  },
+  {
+    q: 'Do I need prior coding experience?',
+    a: 'Not necessarily! Our roadmaps range from beginner basics to advanced system design. Whether you are a freshman or a senior looking for developer internships, Provn has a structured learning path for you.',
+  },
+];
+
+const FAQItem = ({ question, answer, isOpen, onToggle }) => (
+  <div className="border-brutal bg-white mb-4 transition-transform hover:-translate-y-1">
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center justify-between p-5 text-left cursor-pointer group"
+    >
+      <span className="font-mono text-sm font-bold uppercase tracking-tight pr-4">
+        {question}
+      </span>
+      <ChevronDown
+        size={20}
+        className={`shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+      />
+    </button>
+    <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-60' : 'max-h-0'}`}>
+      <div className="px-5 pb-5 border-t-2 border-black/10 pt-4">
+        <p className="font-mono text-xs leading-relaxed text-muted">
+          {answer}
+        </p>
+      </div>
+    </div>
+  </div>
+);
+
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
@@ -71,36 +115,72 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function LandingPage() {
+  const [openFaq, setOpenFaq] = useState(null);
+
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": landingFaqs.map(faq => ({
+      "@type": "Question",
+      "name": faq.q,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": faq.a
+      }
+    }))
+  };
+
   return (
-    <div className="overflow-hidden">
+    <main className="overflow-hidden">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify([
+            structuredData,
+            {
+              "@context": "https://schema.org",
+              "@type": "SoftwareApplication",
+              "name": "Provn",
+              "applicationCategory": "EducationalApplication",
+              "operatingSystem": "Web",
+              "description": "A premier tech career readiness platform that provides software engineering roadmaps, real-world coding tasks, and direct recruiter access.",
+              "offers": {
+                "@type": "Offer",
+                "price": "0",
+                "priceCurrency": "USD"
+              }
+            }
+          ])
+        }}
+      />
       {/* ─── Hero Section ─────────────────────── */}
-      <section className="relative bg-lime border-b-4 border-black">
+      <section className="relative bg-lime border-b-4 border-black" aria-label="Hero Section">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24 lg:py-32">
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-6 animate-fade-in-up stagger-1">
               <Badge variant="dark">BETA</Badge>
               <Badge variant="default">
-                <Sparkles size={12} className="mr-1" />
+                <Sparkles size={12} className="mr-1" aria-hidden="true" />
                 NOW LIVE
               </Badge>
             </div>
 
-            <h1 className="heading-brutal text-5xl sm:text-7xl lg:text-8xl xl:text-9xl mb-6 animate-fade-in-up stagger-2">
-              START YOUR
-              <br />
-              <span className="relative">
-                CAREER.
-                <svg className="absolute -bottom-2 left-0 w-full h-4" viewBox="0 0 400 12">
+            <h1 className="heading-brutal text-5xl sm:text-7xl lg:text-8xl xl:text-9xl mb-6 animate-fade-in-up stagger-2 flex flex-col">
+              <span className="text-xl sm:text-2xl mb-2 font-mono text-black/80 uppercase tracking-widest">Provn Tech Career Readiness</span>
+              <span>START YOUR</span>
+              <span className="relative w-fit">
+                TECH CAREER.
+                <svg className="absolute -bottom-2 left-0 w-full h-4" viewBox="0 0 400 12" aria-hidden="true">
                   <path d="M0 6 Q100 0 200 6 Q300 12 400 6" stroke="black" strokeWidth="3" fill="none" /> 
                 </svg>
               </span>
             </h1>
 
             <p className="max-w-xl text-lg sm:text-xl font-mono font-bold mb-8 animate-fade-in-up stagger-3">
-              The platform that bridges the gap between
-              <span className="bg-black text-lime px-2 mx-1">campus learning</span>
+              <span className="text-black">Provn</span> is the software engineering platform that bridges the gap between
+              <span className="bg-black text-lime px-2 mx-1">campus coding</span>
               and
-              <span className="bg-black text-purple px-2 mx-1">industry hiring</span>.
+              <span className="bg-black text-purple px-2 mx-1">tech hiring</span>.
             </p>
 
             <div className="flex flex-wrap gap-4 animate-fade-in-up stagger-4">
@@ -137,7 +217,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── Stats Bar ────────────────────────── */}
-      <section className="border-b-4 border-black bg-white">
+      <section className="border-b-4 border-black bg-white" aria-label="Platform Statistics">
         <div className="max-w-7xl mx-auto grid grid-cols-2 lg:grid-cols-4">
           {stats.map((stat, i) => {
             const Icon = stat.icon;
@@ -151,7 +231,7 @@ export default function LandingPage() {
                   ${i === 2 ? 'border-b-2 lg:border-b-0 border-black border-r-2 lg:border-r-2' : ''}
                 `}
               >
-                <Icon size={24} className="mx-auto mb-2 text-muted" />
+                <Icon size={24} className="mx-auto mb-2 text-muted" aria-hidden="true" />
                 <div className="heading-brutal text-3xl sm:text-4xl mb-1">{stat.value}</div>
                 <div className="label-brutal text-muted">{stat.label}</div>
               </div>
@@ -161,26 +241,26 @@ export default function LandingPage() {
       </section>
 
       {/* ─── Trending Skills 2026 ──────────────── */}
-      <section className="py-16 sm:py-24 bg-white border-b-4 border-black">
+      <section className="py-16 sm:py-24 bg-white border-b-4 border-black" aria-label="Tech Job Trends">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex flex-col lg:flex-row items-center gap-12">
             <div className="flex-1 text-center lg:text-left">
               <Badge variant="dark" className="mb-4">
-                <TrendingUp size={12} className="mr-1" />
-                2026 JOB TRENDS
+                <TrendingUp size={12} className="mr-1" aria-hidden="true" />
+                2026 TECH JOB TRENDS
               </Badge>
               <h2 className="heading-brutal text-4xl sm:text-5xl lg:text-6xl mb-6">
                 THE FUTURE IS
                 <br />
-                <span className="inline-block mt-2 text-lime bg-black px-3 pb-1 shadow-brutal-lime">DATA-DRIVEN</span>
+                <span className="inline-block mt-2 text-lime bg-black px-3 pb-1 shadow-brutal-lime">SOFTWARE-DRIVEN</span>
               </h2>
               <p className="font-mono text-sm leading-relaxed text-muted max-w-lg mx-auto lg:mx-0 mb-8">
-                Based on projected industry demands for 2026, tech roles are polarizing. Specialized skills in AI, Cloud architecture, and secure data pipelines are skyrocketing.
+                Based on projected industry demands for 2026, software engineering roles are polarizing. Specialized coding skills in AI, Cloud architecture, and secure data pipelines are skyrocketing.
                 <br /><br />
-                Our roadmaps prioritize the skills that future employers actually hire for.
+                Our developer roadmaps prioritize the technical skills that future tech employers actually hire for.
               </p>
               <div className="flex gap-4 justify-center lg:justify-start">
-                <Link href="/discover">
+                <Link href="/discover" aria-label="Explore Developer Roadmaps">
                   <Button variant="primary" icon={ArrowRight} iconPosition="right">Explore Roadmaps</Button>
                 </Link>
               </div>
@@ -213,14 +293,14 @@ export default function LandingPage() {
       </section>
 
       {/* ─── The Playbook ─────────────────────── */}
-      <section id="playbook" className="py-16 sm:py-24 bg-bg">
+      <section id="playbook" className="py-16 sm:py-24 bg-bg" aria-label="How Provn Works">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12 sm:mb-16">
-            <Badge variant="dark" className="mb-4">THE PLAYBOOK</Badge>
+            <Badge variant="dark" className="mb-4">THE DEVELOPER PLAYBOOK</Badge>
             <h2 className="heading-brutal text-4xl sm:text-5xl lg:text-6xl">
               THREE STEPS TO
               <br />
-              <span className="text-purple">YOUR DREAM JOB</span>
+              <span className="text-purple">YOUR TECH CAREER</span>
             </h2>
           </div>
 
@@ -235,8 +315,8 @@ export default function LandingPage() {
                   className={`animate-fade-in-up stagger-${i + 1}`}
                 >
                   <div className="flex items-start justify-between mb-6">
-                    <span className="heading-brutal text-6xl opacity-20">{step.num}</span>
-                    <div className="w-12 h-12 bg-black text-white flex items-center justify-center border-2 border-black">
+                    <span className="heading-brutal text-6xl opacity-20" aria-hidden="true">{step.num}</span>
+                    <div className="w-12 h-12 bg-black text-white flex items-center justify-center border-2 border-black" aria-hidden="true">
                       <Icon size={24} />
                     </div>
                   </div>
@@ -250,35 +330,35 @@ export default function LandingPage() {
       </section>
 
       {/* ─── Role Cards ───────────────────────── */}
-      <section className="py-16 sm:py-24 bg-white border-y-4 border-black">
+      <section className="py-16 sm:py-24 bg-white border-y-4 border-black" aria-label="Who is Provn For">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
             <h2 className="heading-brutal text-4xl sm:text-5xl mb-4">WHO IS PROVN FOR?</h2>
             <p className="font-mono text-sm text-muted max-w-lg mx-auto">
-              Whether you&apos;re a student, recruiter, or institution — there&apos;s a seat for you at the table.
+              Whether you&apos;re a computer science student, a tech recruiter, or an academic institution — there&apos;s a seat for you at the table.
             </p>
           </div>
 
           <div className="grid sm:grid-cols-3 gap-6">
             <Card variant="lime" padding="lg" hoverable>
-              <GraduationCap size={32} className="mb-4" />
-              <h3 className="heading-brutal text-xl mb-2">Students</h3>
+              <GraduationCap size={32} className="mb-4" aria-hidden="true" />
+              <h3 className="heading-brutal text-xl mb-2">CS Students</h3>
               <p className="font-mono text-xs font-medium leading-relaxed">
-                Build real skills, complete projects, and create a verified portfolio that gets you hired.
+                Build real software skills, complete coding projects, and create a verified developer portfolio that gets you hired as a software engineer.
               </p>
             </Card>
             <Card variant="purple" padding="lg" hoverable>
-              <Briefcase size={32} className="mb-4" />
-              <h3 className="heading-brutal text-xl mb-2">Industry</h3>
+              <Briefcase size={32} className="mb-4" aria-hidden="true" />
+              <h3 className="heading-brutal text-xl mb-2">Tech Industry</h3>
               <p className="font-mono text-xs font-medium leading-relaxed">
-                Post challenges, review work, and hire candidates who&apos;ve already proved their skills.
+                Post technical challenges, review engineering work, and hire tech candidates who&apos;ve already proved their coding skills.
               </p>
             </Card>
             <Card variant="yellow" padding="lg" hoverable>
-              <Shield size={32} className="mb-4" />
+              <Shield size={32} className="mb-4" aria-hidden="true" />
               <h3 className="heading-brutal text-xl mb-2">Colleges</h3>
               <p className="font-mono text-xs font-medium leading-relaxed">
-                Track student progress, boost placement rates, and partner with industry leaders.
+                Track student coding progress, boost tech placement rates, and partner with leading tech companies.
               </p>
             </Card>
           </div>
@@ -385,6 +465,32 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ─── FAQ Section ──────────────────────── */}
+      <section className="py-16 sm:py-24 bg-bg border-t-4 border-black">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-12">
+            <Badge variant="purple" className="mb-4">GOT QUESTIONS?</Badge>
+            <h2 className="heading-brutal text-4xl sm:text-5xl mb-4">
+              FREQUENTLY ASKED
+              <br />
+              <span className="text-purple">QUESTIONS</span>
+            </h2>
+          </div>
+          
+          <div className="flex flex-col">
+            {landingFaqs.map((faq, index) => (
+              <FAQItem
+                key={index}
+                question={faq.q}
+                answer={faq.a}
+                isOpen={openFaq === index}
+                onToggle={() => setOpenFaq(openFaq === index ? null : index)}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ─── Footer ───────────────────────────── */}
       <footer className="bg-white border-t-4 border-black">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
@@ -413,7 +519,7 @@ export default function LandingPage() {
             <div>
               <h4 className="label-brutal mb-3">COMPANY</h4>
               <div className="flex flex-col gap-2">
-                <span className="font-mono text-xs text-muted">About (Coming Soon)</span>
+                <Link href="/about" className="font-mono text-xs hover:text-lime transition-colors">About Us</Link>
                 <span className="font-mono text-xs text-muted">Blog (Coming Soon)</span>
                 <Link href="/pricing" className="font-mono text-xs hover:text-lime transition-colors">Pricing</Link>
                 <a href="mailto:hello@provn.live" className="font-mono text-xs hover:text-lime transition-colors">hello@provn.live</a>
@@ -423,13 +529,13 @@ export default function LandingPage() {
             <div>
               <h4 className="label-brutal mb-3">LEGAL</h4>
               <div className="flex flex-col gap-2">
-                <span className="font-mono text-xs text-muted">Privacy Policy</span>
-                <span className="font-mono text-xs text-muted">Terms of Service</span>
+                <Link href="/privacy" className="font-mono text-xs hover:text-lime transition-colors">Privacy Policy</Link>
+                <Link href="/terms" className="font-mono text-xs hover:text-lime transition-colors">Terms of Service</Link>
               </div>
             </div>
           </div>
         </div>
       </footer>
-    </div>
+    </main>
   );
 }

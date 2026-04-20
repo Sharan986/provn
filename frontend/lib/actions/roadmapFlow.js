@@ -45,6 +45,14 @@ export async function submitTaskWork(taskId, content) {
   return { success: true, data: { ...data?.data, status: finalStatus }, message };
 }
 
+export async function provisionTaskRepo(taskId) {
+  const { data, error } = await apiFetch(`/tasks/${taskId}/provision`, {
+    method: 'POST',
+  });
+  if (error || data?.error) return { error: error || data?.error, success: false };
+  return { success: true, data: data };
+}
+
 export async function getUserTotalScore() {
   const { data, error } = await apiFetch('/scores/dashboard', { method: 'GET' });
   if (error || data?.error) return { error: error || data?.error, data: 0 };

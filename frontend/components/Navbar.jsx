@@ -63,7 +63,7 @@ export default function Navbar() {
     { href: '/discover', label: 'Discover', icon: Compass },
     { href: '/marketplace', label: 'Jobs', icon: Building2 },
     { href: '/simulator', label: 'Simulator', icon: Zap },
-    { href: '/pricing', label: 'Pricing', icon: Crown },
+    ...(user?.profile?.subscription_tier === 'pro' ? [] : [{ href: '/pricing', label: 'Pricing', icon: Crown }]),
   ] : [];
 
   return (
@@ -108,9 +108,11 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-3">
             {isLoggedIn ? (
               <>
-                <Link href="/pricing">
-                  <Badge variant="purple" size="sm">PRO</Badge>
-                </Link>
+                {user?.profile?.subscription_tier !== 'pro' && (
+                  <Link href="/pricing">
+                    <Badge variant="purple" size="sm">PRO</Badge>
+                  </Link>
+                )}
                 <button
                   onClick={handleSignOut}
                   className="flex items-center gap-1.5 px-3 py-2 font-mono text-xs font-bold uppercase border-2 border-transparent hover:border-black hover:bg-bg-dark transition-all cursor-pointer"
