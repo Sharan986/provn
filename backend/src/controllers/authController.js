@@ -7,7 +7,7 @@ const githubService = require('../services/githubService');
 const client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_CALLBACK_URL
+  process.env.GOOGLE_CALLBACK_URL || 'https://api.provn.live/auth/google/callback'
 );
 
 
@@ -24,20 +24,19 @@ function signTokens(userId, role) {
 
 function setTokenCookies(res, accessToken, refreshToken) {
   const isProd = process.env.NODE_ENV === 'production';
-
-  res.cookie('provn_access', accessToken, {
+  const cookieOptions = {
     httpOnly: true,
-    secure:   true,
+    secure: true,
     sameSite: 'none',
-    maxAge:   7 * 24 * 60 * 60 * 1000, // 7 days
-  });
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  };
+  
+  if (isProd) {
+    cookieOptions.domain = '.provn.live';
+  }
 
-  res.cookie('provn_refresh', refreshToken, {
-    httpOnly: true,
-    secure:   true,
-    sameSite: 'none',
-    maxAge:   7 * 24 * 60 * 60 * 1000, // 7 days
-  });
+  res.cookie('provn_access', accessToken, cookieOptions);
+  res.cookie('provn_refresh', refreshToken, cookieOptions);
 }
 
 function safeUser(row) {
@@ -314,7 +313,7 @@ async function googleCallback(req, res) {
     const { accessToken, refreshToken } = signTokens(user.id, user.role);
     setTokenCookies(res, accessToken, refreshToken);
 
-    const redirectPath = state ? decodeURIComponent(state) : (isNewUser ? '/onboarding/student' : `/dashboard/${user.role}`);
+    const redirectPath = isNewUser ? '/onboarding/student' : (state ? decodeURIComponent(state) : `/dashboard/${user.role}`);
     return res.redirect(`${FRONTEND_URL}${redirectPath}`);
   } catch (err) {
     console.error('googleCallback error:', err);
@@ -380,7 +379,7 @@ async function githubCallback(req, res) {
     const { accessToken: jwtAccess, refreshToken: jwtRefresh } = signTokens(user.id, user.role);
     setTokenCookies(res, jwtAccess, jwtRefresh);
 
-    const redirectPath = state ? decodeURIComponent(state) : (isNewUser ? '/onboarding/student' : `/dashboard/${user.role}`);
+    const redirectPath = isNewUser ? '/onboarding/student' : (state ? decodeURIComponent(state) : `/dashboard/${user.role}`);
     return res.redirect(`${FRONTEND_URL}${redirectPath}`);
   } catch (err) {
     console.error('githubCallback error:', err);
