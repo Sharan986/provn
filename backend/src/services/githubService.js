@@ -4,7 +4,7 @@ const { Octokit } = require('@octokit/rest');
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 // The callback URL should match the one configured in the GitHub OAuth App
-const GITHUB_REDIRECT_URI = process.env.GITHUB_REDIRECT_URI || 'http://localhost:3000/api/auth/github/callback';
+const GITHUB_REDIRECT_URI = process.env.GITHUB_REDIRECT_URI || 'https://api.provn.live/auth/github/callback';
 
 function getGithubAuthUrl(state) {
   const scope = 'repo user'; // 'repo' is needed to create repositories
