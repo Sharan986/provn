@@ -16,7 +16,8 @@ import {
   Loader2, X, ExternalLink, BookOpen, Target, Play,
   Users, BarChart3, Zap, TrendingUp, Youtube, Eye,
   ThumbsUp, GraduationCap, ChevronRight, Award, Flame,
-  Code, Brain, ShieldCheck, AlertCircle, Github
+  Code, Brain, ShieldCheck, AlertCircle, Github,
+  List, GitBranch, ChevronDown
 } from 'lucide-react';
 import Button from '@/components/Button';
 import Card from '@/components/Card';
@@ -34,6 +35,108 @@ import { searchYouTubeCourses } from '@/lib/actions/youtube';
 import { getSimulatorChallenges, getSimulatorProgress, getReadinessScore } from '@/lib/actions/simulator';
 import { getBestSkillScore, getSkillProjects } from '@/lib/actions/skillTests';
 import SkillNode from '@/components/roadmap/SkillNode';
+import RoadmapTree from '@/components/roadmap/RoadmapTree';
+
+// Helper: safely parse a description (might be string, object, or null)
+function parseDescription(desc) {
+  if (!desc) return { type: 'text', content: '' };
+  
+  // If it's already an object, return it (Postgres JSONB returns objects directly)
+  if (typeof desc === 'object') return desc;
+
+  if (typeof desc === 'string') {
+    try {
+      // First attempt: standard parse
+      let parsed = JSON.parse(desc);
+      
+      // Sometimes it's double-encoded stringified JSON
+      if (typeof parsed === 'string') {
+        parsed = JSON.parse(parsed);
+      }
+      
+      if (parsed && typeof parsed === 'object') {
+        return parsed;
+      }
+    } catch (e) {
+      // Second attempt: cleanup common SQL insert artifacts
+      try {
+        // Replace unescaped newlines within string values, etc (basic cleanup)
+        const cleaned = desc.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+        const parsedClean = JSON.parse(cleaned);
+        if (parsedClean && typeof parsedClean === 'object') return parsedClean;
+      } catch (e2) {
+        // Fallback: it's just raw text
+        return { type: 'text', content: desc };
+      }
+    }
+    return { type: 'text', content: desc };
+  }
+  
+  return { type: 'text', content: String(desc) };
+}
+
+// Helper: extract short text from a description for simple displays
+function getDescriptionText(desc) {
+  const d = parseDescription(desc);
+  if (d.type === 'text') return d.content || '';
+  if (d.type === 'subtopics' && d.subtopics?.length) {
+    return d.subtopics.map(s => s.title).join(' · ');
+  }
+  return '';
+}
+
+// Component: render a rich description in the side panel
+function SkillDescription({ description }) {
+  const desc = parseDescription(description);
+  const [expandedIdx, setExpandedIdx] = useState(null);
+
+  if (desc.type === 'text' && desc.content) {
+    return (
+      <p className="font-mono text-xs text-muted mt-2 leading-relaxed">
+        {desc.content}
+      </p>
+    );
+  }
+
+  if (desc.type === 'subtopics' && desc.subtopics?.length) {
+    return (
+      <div className="mt-3 space-y-1.5">
+        <span className="font-mono text-[10px] text-muted font-bold uppercase tracking-wider">
+          {desc.subtopics.length} Subtopics
+        </span>
+        {desc.subtopics.map((sub, i) => (
+          <div
+            key={i}
+            className="border-2 border-black bg-white overflow-hidden"
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpandedIdx(expandedIdx === i ? null : i);
+              }}
+              className="w-full px-3 py-2 flex items-center justify-between gap-2 hover:bg-bg-dark transition-colors text-left"
+            >
+              <span className="font-bold text-xs uppercase tracking-tight">{sub.title}</span>
+              <ChevronDown
+                size={12}
+                className={`transition-transform shrink-0 ${expandedIdx === i ? 'rotate-180' : ''}`}
+              />
+            </button>
+            {expandedIdx === i && sub.description && (
+              <div className="px-3 pb-3 border-t border-black/10">
+                <p className="font-mono text-[11px] text-muted leading-relaxed mt-2">
+                  {sub.description}
+                </p>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return null;
+}
 
 // Node types for React Flow
 const nodeTypes = {
@@ -55,6 +158,7 @@ export default function RoadmapFlowPage() {
   const [tasks, setTasks] = useState([]);
   const [progress, setProgress] = useState(null);
   const [isPro, setIsPro] = useState(true);
+  const [viewMode, setViewMode] = useState('tree'); // 'tree' | 'flow'
 
   // Side panel state
   const [selectedSkill, setSelectedSkill] = useState(null);
@@ -148,7 +252,7 @@ export default function RoadmapFlowPage() {
       },
       data: {
         label: skill.name,
-        description: skill.description,
+        description: getDescriptionText(skill.description),
         status: completedSkills.includes(skill.id)
           ? 'completed'
           : inProgressSkills.includes(skill.id)
@@ -445,62 +549,108 @@ export default function RoadmapFlowPage() {
         </div>
       </div>
 
+      {/* View Toggle */}
+      <div className="bg-white border-b-2 border-black px-4 sm:px-6 py-2 flex items-center justify-between">
+        <div className="flex items-center gap-1 bg-bg border-2 border-black p-0.5">
+          <button
+            onClick={() => setViewMode('tree')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 font-mono text-xs font-bold uppercase transition-all ${
+              viewMode === 'tree'
+                ? 'bg-black text-white'
+                : 'hover:bg-bg-dark'
+            }`}
+          >
+            <List size={14} />
+            Tree
+          </button>
+          <button
+            onClick={() => setViewMode('flow')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 font-mono text-xs font-bold uppercase transition-all ${
+              viewMode === 'flow'
+                ? 'bg-black text-white'
+                : 'hover:bg-bg-dark'
+            }`}
+          >
+            <GitBranch size={14} />
+            Flow
+          </button>
+        </div>
+        <span className="font-mono text-[10px] text-muted">
+          {skills.length} skill{skills.length !== 1 ? 's' : ''} · Click a node for details
+        </span>
+      </div>
+
       {/* Main Content */}
       <div className="flex-1 flex relative overflow-hidden">
-        {/* React Flow Canvas */}
-        <div className={`flex-1 transition-all duration-300 ${panelOpen ? 'md:mr-[420px]' : ''}`}>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            nodeTypes={nodeTypes}
-            fitView
-            fitViewOptions={{ padding: 0.3 }}
-            minZoom={0.5}
-            maxZoom={2}
-          >
-            <Background color="#d4d4d4" gap={24} size={2} />
-            <Controls
-              className="border-3 border-black bg-white shadow-brutal"
-              showInteractive={false}
-            />
-            <MiniMap
-              className="border-3 border-black bg-white shadow-brutal"
-              nodeColor={(node) => {
-                if (node.data?.status === 'completed') return '#84cc16';
-                if (node.data?.status === 'in-progress') return '#facc15';
-                return '#fff';
+        {/* Tree View */}
+        {viewMode === 'tree' && (
+          <div className={`flex-1 overflow-y-auto transition-all duration-300 ${panelOpen ? 'md:mr-[420px]' : ''}`}>
+            <RoadmapTree
+              skills={skills}
+              progress={progress}
+              onSkillClick={(skill, subtopic) => {
+                handleNodeClick(skill);
               }}
-              maskColor="rgba(0,0,0,0.1)"
             />
-          </ReactFlow>
+          </div>
+        )}
 
-          {/* Empty state hint */}
-          {skills.length === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="text-center">
-                <div className="w-20 h-20 mx-auto mb-4 bg-bg-dark border-3 border-black flex items-center justify-center">
-                  <BookOpen size={32} className="text-muted" />
-                </div>
-                <h3 className="heading-brutal text-lg mb-2">No Skills Yet</h3>
-                <p className="font-mono text-sm text-muted max-w-xs">
-                  This roadmap doesn&apos;t have any skills defined yet.
-                </p>
-              </div>
-            </div>
-          )}
+        {/* React Flow Canvas */}
+        {viewMode === 'flow' && (
+          <div className={`flex-1 transition-all duration-300 ${panelOpen ? 'md:mr-[420px]' : ''}`}>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              nodeTypes={nodeTypes}
+              fitView
+              fitViewOptions={{ padding: 0.3 }}
+              minZoom={0.5}
+              maxZoom={2}
+            >
+              <Background color="#d4d4d4" gap={24} size={2} />
+              <Controls
+                className="border-3 border-black bg-white shadow-brutal"
+                showInteractive={false}
+              />
+              <MiniMap
+                className="border-3 border-black bg-white shadow-brutal"
+                nodeColor={(node) => {
+                  if (node.data?.status === 'completed') return '#84cc16';
+                  if (node.data?.status === 'in-progress') return '#facc15';
+                  return '#fff';
+                }}
+                maskColor="rgba(0,0,0,0.1)"
+              />
+            </ReactFlow>
+          </div>
+        )}
 
-          {/* Click hint */}
-          {skills.length > 0 && !panelOpen && (
-            <div className="absolute bottom-20 left-1/2 -translate-x-1/2 pointer-events-none">
-              <div className="px-4 py-2 bg-black text-white font-mono text-xs flex items-center gap-2 animate-bounce">
-                <ChevronRight size={14} />
-                Click a skill node to see tasks
+        {/* Empty state hint */}
+        {skills.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="text-center">
+              <div className="w-20 h-20 mx-auto mb-4 bg-bg-dark border-3 border-black flex items-center justify-center">
+                <BookOpen size={32} className="text-muted" />
               </div>
+              <h3 className="heading-brutal text-lg mb-2">No Skills Yet</h3>
+              <p className="font-mono text-sm text-muted max-w-xs">
+                This roadmap doesn&apos;t have any skills defined yet.
+              </p>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Click hint — only in flow mode */}
+        {viewMode === 'flow' && skills.length > 0 && !panelOpen && (
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 pointer-events-none">
+            <div className="px-4 py-2 bg-black text-white font-mono text-xs flex items-center gap-2 animate-bounce">
+              <ChevronRight size={14} />
+              Click a skill node to see tasks
+            </div>
+          </div>
+        )}
 
         {/* Assessment Panel (Overlay) */}
         {showAssessment && (
@@ -732,9 +882,7 @@ export default function RoadmapFlowPage() {
                     </Badge>
                     <h2 className="heading-brutal text-xl leading-tight">{selectedSkill.name}</h2>
                     {selectedSkill.description && (
-                      <p className="font-mono text-xs text-muted mt-2 leading-relaxed">
-                        {selectedSkill.description}
-                      </p>
+                      <SkillDescription description={selectedSkill.description} />
                     )}
                   </div>
                   <button
