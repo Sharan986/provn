@@ -22,9 +22,8 @@ const PORT = process.env.PORT || 3000;
 // Global Middleware
 // ──────────────────────────────────────────
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-
-  credentials: true,
+  origin: "https://provn.live",
+  credentials: true
 }));
 app.use(express.json());
 app.use(cookieParser());

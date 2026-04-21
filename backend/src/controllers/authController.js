@@ -27,15 +27,15 @@ function setTokenCookies(res, accessToken, refreshToken) {
 
   res.cookie('provn_access', accessToken, {
     httpOnly: true,
-    secure:   isProd,
-    sameSite: 'lax',
+    secure:   true,
+    sameSite: 'none',
     maxAge:   7 * 24 * 60 * 60 * 1000, // 7 days
   });
 
   res.cookie('provn_refresh', refreshToken, {
     httpOnly: true,
-    secure:   isProd,
-    sameSite: 'lax',
+    secure:   true,
+    sameSite: 'none',
     maxAge:   7 * 24 * 60 * 60 * 1000, // 7 days
   });
 }
@@ -259,8 +259,10 @@ async function upgradeToPro(req, res) {
  * GET /api/auth/google
  */
 function googleAuth(req, res) {
+  const state = encodeURIComponent('/dashboard/student');
   const url = client.generateAuthUrl({
     access_type: 'offline',
+    state: state,
     scope: [
       'https://www.googleapis.com/auth/userinfo.profile',
       'https://www.googleapis.com/auth/userinfo.email',
@@ -273,8 +275,8 @@ function googleAuth(req, res) {
  * GET /api/auth/google/callback
  */
 async function googleCallback(req, res) {
-  const { code } = req.query;
-  const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const { code, state } = req.query;
+  const FRONTEND_URL = process.env.FRONTEND_URL || 'https://provn.live';
 
   try {
     const { tokens } = await client.getToken(code);
@@ -312,11 +314,8 @@ async function googleCallback(req, res) {
     const { accessToken, refreshToken } = signTokens(user.id, user.role);
     setTokenCookies(res, accessToken, refreshToken);
 
-    if (isNewUser) {
-      return res.redirect(`${FRONTEND_URL}/onboarding/student`);
-    } else {
-      return res.redirect(`${FRONTEND_URL}/dashboard/${user.role}`);
-    }
+    const redirectPath = state ? decodeURIComponent(state) : (isNewUser ? '/onboarding/student' : `/dashboard/${user.role}`);
+    return res.redirect(`${FRONTEND_URL}${redirectPath}`);
   } catch (err) {
     console.error('googleCallback error:', err);
     return res.redirect(`${FRONTEND_URL}/auth?error=google_failed`);
@@ -327,8 +326,7 @@ async function googleCallback(req, res) {
  * GET /api/auth/github
  */
 function githubAuth(req, res) {
-  // Pass user id in state to be safe
-  const state = req.user.id;
+  const state = encodeURIComponent('/dashboard/student');
   const url = githubService.getGithubAuthUrl(state);
   res.redirect(url);
 }
@@ -338,14 +336,9 @@ function githubAuth(req, res) {
  */
 async function githubCallback(req, res) {
   const { code, state } = req.query;
-  const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const FRONTEND_URL = process.env.FRONTEND_URL || 'https://provn.live';
   
   try {
-    const userId = state || req.user?.id;
-    if (!userId) {
-      return res.redirect(`${FRONTEND_URL}/auth?error=unauthorized`);
-    }
-
     const tokenData = await githubService.getGithubAccessToken(code);
     const accessToken = tokenData.access_token;
     
@@ -354,18 +347,44 @@ async function githubCallback(req, res) {
     }
 
     const githubUser = await githubService.getGithubUserProfile(accessToken);
+    const email = githubUser.email || `${githubUser.login}@github.com`;
+    const name = githubUser.name || githubUser.login;
+    const picture = githubUser.avatar_url;
 
-    await pool.query(
-      `UPDATE users 
-       SET github_id = $1, github_username = $2, github_access_token = $3, updated_at = NOW() 
-       WHERE id = $4`,
-      [githubUser.id.toString(), githubUser.login, accessToken, userId]
+    let { rows } = await pool.query(
+      'SELECT * FROM users WHERE github_id = $1 OR email = $2',
+      [githubUser.id.toString(), email.toLowerCase()]
     );
 
-    return res.redirect(`${FRONTEND_URL}/dashboard/student?success=github_linked`);
+    let user = rows[0];
+    let isNewUser = false;
+
+    if (!user) {
+      // Create new user with student role
+      const { rows: newRows } = await pool.query(
+        `INSERT INTO users (email, name, role, avatar_url, password_hash, github_id, github_username, github_access_token)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING *`,
+        [email.toLowerCase(), name, 'student', picture, 'oauth_placeholder', githubUser.id.toString(), githubUser.login, accessToken]
+      );
+      user = newRows[0];
+      isNewUser = true;
+    } else {
+      // Update github token just in case
+      await pool.query(
+        `UPDATE users SET github_id = $1, github_username = $2, github_access_token = $3, updated_at = NOW() WHERE id = $4`,
+        [githubUser.id.toString(), githubUser.login, accessToken, user.id]
+      );
+    }
+
+    const { accessToken: jwtAccess, refreshToken: jwtRefresh } = signTokens(user.id, user.role);
+    setTokenCookies(res, jwtAccess, jwtRefresh);
+
+    const redirectPath = state ? decodeURIComponent(state) : (isNewUser ? '/onboarding/student' : `/dashboard/${user.role}`);
+    return res.redirect(`${FRONTEND_URL}${redirectPath}`);
   } catch (err) {
     console.error('githubCallback error:', err);
-    return res.redirect(`${FRONTEND_URL}/dashboard/student?error=github_failed`);
+    return res.redirect(`${FRONTEND_URL}/auth?error=github_failed`);
   }
 }
 
