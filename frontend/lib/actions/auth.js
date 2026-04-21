@@ -76,8 +76,8 @@ export async function signOut() {
   const cookieStore = await cookies();
   cookieStore.delete('provn_access');
   cookieStore.delete('provn_refresh');
-
-  redirect('/');
+  // Note: redirect() is intentionally NOT called here —
+  // navigation is handled client-side in the Navbar after this resolves.
 }
 
 export async function getCurrentUser() {
