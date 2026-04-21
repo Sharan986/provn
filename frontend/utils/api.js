@@ -51,24 +51,24 @@ export async function apiFetch(endpoint, options = {}) {
         const name = nameValue.slice(0, indexOfEquals);
         const value = nameValue.slice(indexOfEquals + 1);
         
-        let maxAge, path, domain, httpOnly, secure, sameSite;
+        let maxAge, path, httpOnly, secure, sameSite;
         for (const p of rest) {
           const part = p.trim().toLowerCase();
           if (part.startsWith('max-age=')) maxAge = parseInt(part.split('=')[1]);
           if (part.startsWith('path=')) path = part.split('=')[1];
-          if (part.startsWith('domain=')) domain = p.trim().split('=')[1]; // preserve original case
           if (part === 'httponly') httpOnly = true;
           if (part === 'secure') secure = true;
           if (part.startsWith('samesite=')) sameSite = part.split('=')[1];
         }
 
         // Apply it using the native Next.js server cookie store
+        // Note: don't forward 'domain' — the Next.js server sets cookies on its
+        // own response to the browser; domain is handled by the browser automatically.
         cookieStore.set({
           name: name.trim(),
           value: value.trim(),
           maxAge,
           path: path || '/',
-          ...(domain ? { domain } : {}),
           httpOnly,
           secure,
           sameSite

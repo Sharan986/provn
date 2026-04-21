@@ -25,17 +25,23 @@ function signTokens(userId, role) {
   return { accessToken, refreshToken };
 }
 
-function setTokenCookies(res, accessToken, refreshToken) {
-  const isProd = process.env.NODE_ENV === 'production';
+function isLocalRequest(req) {
+  const host = req?.get?.('host') || '';
+  return host.includes('localhost') || host.includes('127.0.0.1');
+}
+
+function setTokenCookies(req, res, accessToken, refreshToken) {
+  const isLocal = isLocalRequest(req);
   const cookieOptions = {
     httpOnly: true,
     secure: true,
-    sameSite: 'none',
+    sameSite: isLocal ? 'lax' : 'none',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: '/',
   };
 
-  if (isProd) {
+  // Only set cross-subdomain domain when actually on provn.live, not localhost
+  if (!isLocal && process.env.NODE_ENV === 'production') {
     cookieOptions.domain = '.provn.live';
   }
 
@@ -43,14 +49,14 @@ function setTokenCookies(res, accessToken, refreshToken) {
   res.cookie('provn_refresh', refreshToken, cookieOptions);
 }
 
-function clearTokenCookies(res) {
-  const isProd = process.env.NODE_ENV === 'production';
+function clearTokenCookies(req, res) {
+  const isLocal = isLocalRequest(req);
   const opts = {
     httpOnly: true,
     secure: true,
-    sameSite: 'none',
+    sameSite: isLocal ? 'lax' : 'none',
     path: '/',
-    ...(isProd ? { domain: '.provn.live' } : {}),
+    ...( !isLocal && process.env.NODE_ENV === 'production' ? { domain: '.provn.live' } : {}),
   };
   res.clearCookie('provn_access', opts);
   res.clearCookie('provn_refresh', opts);
@@ -95,7 +101,7 @@ async function register(req, res) {
 
     const user = rows[0];
     const { accessToken, refreshToken } = signTokens(user.id, user.role);
-    setTokenCookies(res, accessToken, refreshToken);
+    setTokenCookies(req, res, accessToken, refreshToken);
 
     return res.status(201).json({ success: true, role: user.role, data: safeUser(user) });
   } catch (err) {
@@ -134,7 +140,7 @@ async function login(req, res) {
     }
 
     const { accessToken, refreshToken } = signTokens(user.id, user.role);
-    setTokenCookies(res, accessToken, refreshToken);
+    setTokenCookies(req, res, accessToken, refreshToken);
 
     return res.json({ success: true, role: user.role, data: safeUser(user) });
   } catch (err) {
@@ -147,7 +153,7 @@ async function login(req, res) {
  * POST /auth/logout
  */
 function logout(req, res) {
-  clearTokenCookies(res);
+  clearTokenCookies(req, res);
   return res.json({ success: true });
 }
 
@@ -172,7 +178,7 @@ async function refresh(req, res) {
     }
 
     const { accessToken, refreshToken } = signTokens(rows[0].id, rows[0].role);
-    setTokenCookies(res, accessToken, refreshToken);
+    setTokenCookies(req, res, accessToken, refreshToken);
 
     return res.json({ success: true });
   } catch (err) {
@@ -351,7 +357,7 @@ async function googleCallback(req, res) {
     }
 
     const { accessToken, refreshToken } = signTokens(user.id, user.role);
-    setTokenCookies(res, accessToken, refreshToken);
+    setTokenCookies(req, res, accessToken, refreshToken);
 
     const redirectPath = isNewUser ? '/onboarding/student' : originalPath;
     return res.redirect(`${FRONTEND_URL}${redirectPath}`);
@@ -447,7 +453,7 @@ async function githubCallback(req, res) {
     }
 
     const { accessToken: jwtAccess, refreshToken: jwtRefresh } = signTokens(user.id, user.role);
-    setTokenCookies(res, jwtAccess, jwtRefresh);
+    setTokenCookies(req, res, jwtAccess, jwtRefresh);
 
     const redirectPath = isNewUser ? '/onboarding/student' : originalPath;
     return res.redirect(`${FRONTEND_URL}${redirectPath}`);
