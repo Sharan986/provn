@@ -258,10 +258,15 @@ async function upgradeToPro(req, res) {
  * GET /api/auth/google
  */
 function googleAuth(req, res) {
+  const isProd = process.env.NODE_ENV === 'production';
+  const baseUrl = isProd ? (process.env.BASE_URL || 'https://api.provn.live') : 'http://localhost:3000';
+  const redirectUri = `${baseUrl}/auth/google/callback`;
+
   const state = encodeURIComponent('/dashboard/student');
   const url = client.generateAuthUrl({
     access_type: 'offline',
     state: state,
+    redirect_uri: redirectUri,
     scope: [
       'https://www.googleapis.com/auth/userinfo.profile',
       'https://www.googleapis.com/auth/userinfo.email',
@@ -278,7 +283,14 @@ async function googleCallback(req, res) {
   const FRONTEND_URL = process.env.FRONTEND_URL || 'https://provn.live';
 
   try {
-    const { tokens } = await client.getToken(code);
+    const isProd = process.env.NODE_ENV === 'production';
+    const baseUrl = isProd ? (process.env.BASE_URL || 'https://api.provn.live') : 'http://localhost:3000';
+    const redirectUri = `${baseUrl}/auth/google/callback`;
+
+    const { tokens } = await client.getToken({
+      code,
+      redirect_uri: redirectUri
+    });
     client.setCredentials(tokens);
 
     // Get user info from Google
@@ -325,8 +337,12 @@ async function googleCallback(req, res) {
  * GET /api/auth/github
  */
 function githubAuth(req, res) {
+  const isProd = process.env.NODE_ENV === 'production';
+  const baseUrl = isProd ? (process.env.BASE_URL || 'https://api.provn.live') : 'http://localhost:3000';
+  const redirectUri = `${baseUrl}/auth/github/callback`;
+
   const state = encodeURIComponent('/dashboard/student');
-  const url = githubService.getGithubAuthUrl(state);
+  const url = githubService.getGithubAuthUrl(state, redirectUri);
   res.redirect(url);
 }
 
@@ -338,7 +354,11 @@ async function githubCallback(req, res) {
   const FRONTEND_URL = process.env.FRONTEND_URL || 'https://provn.live';
   
   try {
-    const tokenData = await githubService.getGithubAccessToken(code);
+    const isProd = process.env.NODE_ENV === 'production';
+    const baseUrl = isProd ? (process.env.BASE_URL || 'https://api.provn.live') : 'http://localhost:3000';
+    const redirectUri = `${baseUrl}/auth/github/callback`;
+
+    const tokenData = await githubService.getGithubAccessToken(code, redirectUri);
     const accessToken = tokenData.access_token;
     
     if (!accessToken) {

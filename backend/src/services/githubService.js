@@ -6,12 +6,14 @@ const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 // The callback URL should match the one configured in the GitHub OAuth App
 const GITHUB_REDIRECT_URI = process.env.GITHUB_REDIRECT_URI || 'https://api.provn.live/auth/github/callback';
 
-function getGithubAuthUrl(state) {
+function getGithubAuthUrl(state, redirectUri) {
   const scope = 'repo user'; // 'repo' is needed to create repositories
-  return `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(GITHUB_REDIRECT_URI)}&scope=${encodeURIComponent(scope)}&state=${state}`;
+  const uri = redirectUri || GITHUB_REDIRECT_URI;
+  return `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(uri)}&scope=${encodeURIComponent(scope)}&state=${state}`;
 }
 
-async function getGithubAccessToken(code) {
+async function getGithubAccessToken(code, redirectUri) {
+  const uri = redirectUri || GITHUB_REDIRECT_URI;
   try {
     const response = await axios.post(
       'https://github.com/login/oauth/access_token',
@@ -19,7 +21,7 @@ async function getGithubAccessToken(code) {
         client_id: GITHUB_CLIENT_ID,
         client_secret: GITHUB_CLIENT_SECRET,
         code,
-        redirect_uri: GITHUB_REDIRECT_URI,
+        redirect_uri: uri,
       },
       {
         headers: {

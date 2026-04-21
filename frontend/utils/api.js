@@ -2,7 +2,8 @@
 
 import { cookies } from 'next/headers';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const isProd = process.env.NODE_ENV === 'production';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (isProd ? 'https://api.provn.live' : 'http://localhost:3000');
 
 /**
  * A server-side fetch wrapper that automatically forwards the provn_access 
@@ -27,7 +28,8 @@ export async function apiFetch(endpoint, options = {}) {
     headers.set('Cookie', cookieStringProps.join('; '));
   }
 
-  const url = `${API_BASE_URL}${endpoint}`;
+  const baseUrl = API_BASE_URL.replace(/\/+$/, '');
+  const url = `${baseUrl}${endpoint}`;
   
   try {
     const response = await fetch(url, {
@@ -45,7 +47,9 @@ export async function apiFetch(endpoint, options = {}) {
         // Simple manual parse of cookie string to set it back in Next.js config
         const parts = cookieHeader.split(';');
         const [nameValue, ...rest] = parts;
-        const [name, value] = nameValue.split('=');
+        const indexOfEquals = nameValue.indexOf('=');
+        const name = nameValue.slice(0, indexOfEquals);
+        const value = nameValue.slice(indexOfEquals + 1);
         
         let maxAge, path, httpOnly, secure, sameSite;
         for (const p of rest) {
