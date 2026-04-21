@@ -1,30 +1,21 @@
 {
-  "name": "provn",
-  "version": "0.1.0",
+  "name": "provn-monorepo",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "install:all": "npm install && npm install --workspace=frontend && npm install --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev": "concurrently -n \"frontend,backend\" -c \"cyan,magenta\" \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "start:frontend": "npm run start --workspace=frontend",
+    "start:backend": "npm run start --workspace=backend",
+    "build:frontend": "npm run build --workspace=frontend",
+    "lint:frontend": "npm run lint --workspace=frontend"
   },
-  "dependencies": {
-    "@supabase/ssr": "^0.6.1",
-    "@supabase/supabase-js": "^2.49.4",
-    "@xyflow/react": "^12.10.2",
-    "lucide-react": "^0.487.0",
-    "next": "^15.3.0",
-    "posthog-js": "^1.364.7",
-    "posthog-node": "^5.28.11",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "recharts": "^2.15.3"
-  },
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.3",
-    "eslint": "^9.0.0",
-    "eslint-config-next": "^15.3.0",
-    "postcss": "^8.5.3",
-    "tailwindcss": "^4.1.3"
+    "concurrently": "^8.2.2"
   }
 }

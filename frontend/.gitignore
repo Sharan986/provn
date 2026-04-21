@@ -1,0 +1,11 @@
+.next
+.next/
+**/.next
+**/.next/
+frontend/.next
+frontend/.next/
+/out/
+out
+out/
+node_modules
+node_modules/
