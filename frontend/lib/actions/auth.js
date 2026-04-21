@@ -72,12 +72,25 @@ export async function signIn(formData) {
 export async function signOut() {
   await apiFetch('/auth/logout', { method: 'POST' });
   
-  // Clean up cookies locally
   const cookieStore = await cookies();
-  cookieStore.delete('provn_access');
-  cookieStore.delete('provn_refresh');
-  // Note: redirect() is intentionally NOT called here —
-  // navigation is handled client-side in the Navbar after this resolves.
+  const isProd = process.env.NODE_ENV === 'production';
+
+  // Must use set() with maxAge=0 + matching domain instead of delete()
+  // delete() omits the domain attribute, so the browser ignores it for
+  // cookies set with domain=.provn.live
+  const clearOpts = {
+    value: '',
+    maxAge: 0,
+    path: '/',
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
+    ...(isProd ? { domain: '.provn.live' } : {}),
+  };
+
+  cookieStore.set({ name: 'provn_access', ...clearOpts });
+  cookieStore.set({ name: 'provn_refresh', ...clearOpts });
+  // Note: navigation is handled client-side in Navbar after this resolves
 }
 
 export async function getCurrentUser() {
