@@ -258,14 +258,17 @@ async function upgradeToPro(req, res) {
  * GET /api/auth/google
  */
 function googleAuth(req, res) {
-  const isProd = process.env.NODE_ENV === 'production';
-  const baseUrl = isProd ? (process.env.BASE_URL || 'https://api.provn.live') : 'http://localhost:3000';
+  const referer = req.get('Referer') || '';
+  const isLocal = referer.includes('localhost') || referer.includes('127.0.0.1');
+  const baseUrl = isLocal ? 'http://localhost:3000' : (process.env.BASE_URL || 'https://api.provn.live');
   const redirectUri = `${baseUrl}/auth/google/callback`;
 
-  const state = encodeURIComponent('/dashboard/student');
+  const stateObj = { path: '/dashboard/student', isLocal };
+  const stateStr = Buffer.from(JSON.stringify(stateObj)).toString('base64');
+
   const url = client.generateAuthUrl({
     access_type: 'offline',
-    state: state,
+    state: stateStr,
     redirect_uri: redirectUri,
     scope: [
       'https://www.googleapis.com/auth/userinfo.profile',
@@ -279,13 +282,20 @@ function googleAuth(req, res) {
  * GET /api/auth/google/callback
  */
 async function googleCallback(req, res) {
-  const { code, state } = req.query;
-  const FRONTEND_URL = process.env.FRONTEND_URL || 'https://provn.live';
+  let isLocal = false;
+  let originalPath = '/dashboard/student';
+  if (state) {
+    try {
+      const stateObj = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
+      isLocal = stateObj.isLocal;
+      originalPath = stateObj.path || originalPath;
+    } catch(e) {}
+  }
 
   try {
-    const isProd = process.env.NODE_ENV === 'production';
-    const baseUrl = isProd ? (process.env.BASE_URL || 'https://api.provn.live') : 'http://localhost:3000';
+    const baseUrl = isLocal ? 'http://localhost:3000' : (process.env.BASE_URL || 'https://api.provn.live');
     const redirectUri = `${baseUrl}/auth/google/callback`;
+    const FRONTEND_URL = isLocal ? 'http://localhost:3001' : (process.env.FRONTEND_URL || 'https://provn.live');
 
     const { tokens } = await client.getToken({
       code,
@@ -325,7 +335,7 @@ async function googleCallback(req, res) {
     const { accessToken, refreshToken } = signTokens(user.id, user.role);
     setTokenCookies(res, accessToken, refreshToken);
 
-    const redirectPath = isNewUser ? '/onboarding/student' : (state ? decodeURIComponent(state) : `/dashboard/${user.role}`);
+    const redirectPath = isNewUser ? '/onboarding/student' : originalPath;
     return res.redirect(`${FRONTEND_URL}${redirectPath}`);
   } catch (err) {
     console.error('googleCallback error:', err);
@@ -337,12 +347,15 @@ async function googleCallback(req, res) {
  * GET /api/auth/github
  */
 function githubAuth(req, res) {
-  const isProd = process.env.NODE_ENV === 'production';
-  const baseUrl = isProd ? (process.env.BASE_URL || 'https://api.provn.live') : 'http://localhost:3000';
+  const referer = req.get('Referer') || '';
+  const isLocal = referer.includes('localhost') || referer.includes('127.0.0.1');
+  const baseUrl = isLocal ? 'http://localhost:3000' : (process.env.BASE_URL || 'https://api.provn.live');
   const redirectUri = `${baseUrl}/auth/github/callback`;
 
-  const state = encodeURIComponent('/dashboard/student');
-  const url = githubService.getGithubAuthUrl(state, redirectUri);
+  const stateObj = { path: '/dashboard/student', isLocal };
+  const stateStr = Buffer.from(JSON.stringify(stateObj)).toString('base64');
+
+  const url = githubService.getGithubAuthUrl(stateStr, redirectUri);
   res.redirect(url);
 }
 
@@ -350,13 +363,20 @@ function githubAuth(req, res) {
  * GET /api/auth/github/callback
  */
 async function githubCallback(req, res) {
-  const { code, state } = req.query;
-  const FRONTEND_URL = process.env.FRONTEND_URL || 'https://provn.live';
+  let isLocal = false;
+  let originalPath = '/dashboard/student';
+  if (state) {
+    try {
+      const stateObj = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
+      isLocal = stateObj.isLocal;
+      originalPath = stateObj.path || originalPath;
+    } catch(e) {}
+  }
   
   try {
-    const isProd = process.env.NODE_ENV === 'production';
-    const baseUrl = isProd ? (process.env.BASE_URL || 'https://api.provn.live') : 'http://localhost:3000';
+    const baseUrl = isLocal ? 'http://localhost:3000' : (process.env.BASE_URL || 'https://api.provn.live');
     const redirectUri = `${baseUrl}/auth/github/callback`;
+    const FRONTEND_URL = isLocal ? 'http://localhost:3001' : (process.env.FRONTEND_URL || 'https://provn.live');
 
     const tokenData = await githubService.getGithubAccessToken(code, redirectUri);
     const accessToken = tokenData.access_token;
@@ -399,7 +419,7 @@ async function githubCallback(req, res) {
     const { accessToken: jwtAccess, refreshToken: jwtRefresh } = signTokens(user.id, user.role);
     setTokenCookies(res, jwtAccess, jwtRefresh);
 
-    const redirectPath = isNewUser ? '/onboarding/student' : (state ? decodeURIComponent(state) : `/dashboard/${user.role}`);
+    const redirectPath = isNewUser ? '/onboarding/student' : originalPath;
     return res.redirect(`${FRONTEND_URL}${redirectPath}`);
   } catch (err) {
     console.error('githubCallback error:', err);
