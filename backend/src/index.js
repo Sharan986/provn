@@ -56,4 +56,7 @@ app.use((err, _req, res, _next) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Provn backend running on http://localhost:${PORT}`);
+  console.log(`   NODE_ENV: ${process.env.NODE_ENV}`);
+  console.log(`   Cookie domain: ${process.env.NODE_ENV === 'production' ? '.provn.live' : '(none - dev mode)'}`);
+  console.log(`   CORS origin: ${process.env.FRONTEND_URL || 'https://provn.live'}`);
 });

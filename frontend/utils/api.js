@@ -62,6 +62,8 @@ export async function apiFetch(endpoint, options = {}) {
         }
 
         // Apply it using the native Next.js server cookie store
+        // Note: don't forward 'domain' — the Next.js server sets cookies on its
+        // own response to the browser; domain is handled by the browser automatically.
         cookieStore.set({
           name: name.trim(),
           value: value.trim(),
