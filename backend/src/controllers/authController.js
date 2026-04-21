@@ -7,12 +7,15 @@ const githubService = require('../services/githubService');
 const client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_CALLBACK_URL || 'https://api.provn.live/auth/google/callback'
 );
 
+// ─── Startup validation: fail fast if secrets are missing ─────────────────────
 
-const ACCESS_SECRET  = process.env.JWT_SECRET         || 'provn_access_super_secret_change_me';
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'provn_refresh_super_secret_change_me';
+const ACCESS_SECRET  = process.env.JWT_SECRET;
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
+
+if (!ACCESS_SECRET)  throw new Error('JWT_SECRET env var is required');
+if (!REFRESH_SECRET) throw new Error('JWT_REFRESH_SECRET env var is required');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -29,8 +32,9 @@ function setTokenCookies(res, accessToken, refreshToken) {
     secure: true,
     sameSite: 'none',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/',
   };
-  
+
   if (isProd) {
     cookieOptions.domain = '.provn.live';
   }
@@ -39,28 +43,36 @@ function setTokenCookies(res, accessToken, refreshToken) {
   res.cookie('provn_refresh', refreshToken, cookieOptions);
 }
 
+function clearTokenCookies(res) {
+  const isProd = process.env.NODE_ENV === 'production';
+  const opts = {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    path: '/',
+    ...(isProd ? { domain: '.provn.live' } : {}),
+  };
+  res.clearCookie('provn_access', opts);
+  res.clearCookie('provn_refresh', opts);
+}
+
 function safeUser(row) {
-  const { password_hash, ...safe } = row;
+  const { password_hash, github_access_token, ...safe } = row;
   return safe;
 }
 
 // ─── Controllers ──────────────────────────────────────────────────────────────
 
 /**
- * POST /api/auth/register
- * Body: { email, password, name, role }
+ * POST /auth/register
+ * Body: { email, password, name }
  */
 async function register(req, res) {
-  const { email, password, name, role = 'student' } = req.body;
+  const { email, password, name } = req.body;
 
   if (!email || !password || !name) {
     return res.status(400).json({ error: 'email, password and name are required' });
   }
-
-  const validRoles = ['student', 'industry', 'college', 'admin'];
-  // Role is always student for now as per request
-  const finalRole = 'student';
-
 
   try {
     // Check duplicate
@@ -78,9 +90,8 @@ async function register(req, res) {
        VALUES ($1, $2, $3, $4)
        RETURNING id, email, name, role, branch, interests,
                  current_roadmap_id, subscription_tier, company_name, avatar_url, created_at`,
-      [email.toLowerCase(), password_hash, name, finalRole]
+      [email.toLowerCase(), password_hash, name, 'student']
     );
-
 
     const user = rows[0];
     const { accessToken, refreshToken } = signTokens(user.id, user.role);
@@ -94,7 +105,7 @@ async function register(req, res) {
 }
 
 /**
- * POST /api/auth/login
+ * POST /auth/login
  * Body: { email, password }
  */
 async function login(req, res) {
@@ -133,16 +144,15 @@ async function login(req, res) {
 }
 
 /**
- * POST /api/auth/logout
+ * POST /auth/logout
  */
 function logout(req, res) {
-  res.clearCookie('provn_access');
-  res.clearCookie('provn_refresh');
+  clearTokenCookies(res);
   return res.json({ success: true });
 }
 
 /**
- * POST /api/auth/refresh
+ * POST /auth/refresh
  * Uses refresh token cookie to issue a new access token.
  */
 async function refresh(req, res) {
@@ -171,14 +181,14 @@ async function refresh(req, res) {
 }
 
 /**
- * GET /api/auth/me
+ * GET /auth/me
  */
 function me(req, res) {
   return res.json({ data: req.user });
 }
 
 /**
- * PUT /api/auth/profile
+ * PUT /auth/profile
  * Body: { name, branch, interests }  (interests as comma-separated string or array)
  */
 async function updateProfile(req, res) {
@@ -208,7 +218,7 @@ async function updateProfile(req, res) {
 }
 
 /**
- * PUT /api/auth/onboarding
+ * PUT /auth/onboarding
  * Body: { branch, interests, currentRoadmapId, orgName }
  */
 async function updateOnboarding(req, res) {
@@ -239,7 +249,7 @@ async function updateOnboarding(req, res) {
 }
 
 /**
- * PUT /api/auth/upgrade
+ * PUT /auth/upgrade
  */
 async function upgradeToPro(req, res) {
   try {
@@ -255,12 +265,14 @@ async function upgradeToPro(req, res) {
 }
 
 /**
- * GET /api/auth/google
+ * GET /auth/google
  */
 function googleAuth(req, res) {
   const referer = req.get('Referer') || '';
   const isLocal = referer.includes('localhost') || referer.includes('127.0.0.1');
-  const baseUrl = isLocal ? 'http://localhost:3000' : (process.env.BASE_URL || 'https://api.provn.live');
+  const baseUrl = isLocal
+    ? 'http://localhost:3000'
+    : (process.env.BASE_URL || 'https://api.provn.live');
   const redirectUri = `${baseUrl}/auth/google/callback`;
 
   const stateObj = { path: '/dashboard/student', isLocal };
@@ -279,9 +291,13 @@ function googleAuth(req, res) {
 }
 
 /**
- * GET /api/auth/google/callback
+ * GET /auth/google/callback
  */
 async function googleCallback(req, res) {
+  // Bug fix #1: destructure code and state from req.query
+  const { code, state } = req.query;
+
+  // Decode state first so FRONTEND_URL is available for the catch block (bug fix #2)
   let isLocal = false;
   let originalPath = '/dashboard/student';
   if (state) {
@@ -289,18 +305,21 @@ async function googleCallback(req, res) {
       const stateObj = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
       isLocal = stateObj.isLocal;
       originalPath = stateObj.path || originalPath;
-    } catch(e) {}
+    } catch(e) { /* ignore malformed state */ }
   }
 
-  try {
-    const baseUrl = isLocal ? 'http://localhost:3000' : (process.env.BASE_URL || 'https://api.provn.live');
-    const redirectUri = `${baseUrl}/auth/google/callback`;
-    const FRONTEND_URL = isLocal ? 'http://localhost:3001' : (process.env.FRONTEND_URL || 'https://provn.live');
+  // Declare FRONTEND_URL before try so catch block can access it (bug fix #2)
+  const FRONTEND_URL = isLocal
+    ? 'http://localhost:3001'
+    : (process.env.FRONTEND_URL || 'https://provn.live');
 
-    const { tokens } = await client.getToken({
-      code,
-      redirect_uri: redirectUri
-    });
+  try {
+    const baseUrl = isLocal
+      ? 'http://localhost:3000'
+      : (process.env.BASE_URL || 'https://api.provn.live');
+    const redirectUri = `${baseUrl}/auth/google/callback`;
+
+    const { tokens } = await client.getToken({ code, redirect_uri: redirectUri });
     client.setCredentials(tokens);
 
     // Get user info from Google
@@ -321,7 +340,6 @@ async function googleCallback(req, res) {
     let isNewUser = false;
 
     if (!user) {
-      // Create new user with student role
       const { rows: newRows } = await pool.query(
         `INSERT INTO users (email, name, role, avatar_url, password_hash)
          VALUES ($1, $2, $3, $4, $5)
@@ -344,12 +362,14 @@ async function googleCallback(req, res) {
 }
 
 /**
- * GET /api/auth/github
+ * GET /auth/github
  */
 function githubAuth(req, res) {
   const referer = req.get('Referer') || '';
   const isLocal = referer.includes('localhost') || referer.includes('127.0.0.1');
-  const baseUrl = isLocal ? 'http://localhost:3000' : (process.env.BASE_URL || 'https://api.provn.live');
+  const baseUrl = isLocal
+    ? 'http://localhost:3000'
+    : (process.env.BASE_URL || 'https://api.provn.live');
   const redirectUri = `${baseUrl}/auth/github/callback`;
 
   const stateObj = { path: '/dashboard/student', isLocal };
@@ -360,9 +380,13 @@ function githubAuth(req, res) {
 }
 
 /**
- * GET /api/auth/github/callback
+ * GET /auth/github/callback
  */
 async function githubCallback(req, res) {
+  // Bug fix #1: destructure code and state from req.query
+  const { code, state } = req.query;
+
+  // Decode state first so FRONTEND_URL is available for the catch block (bug fix #2)
   let isLocal = false;
   let originalPath = '/dashboard/student';
   if (state) {
@@ -370,17 +394,23 @@ async function githubCallback(req, res) {
       const stateObj = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
       isLocal = stateObj.isLocal;
       originalPath = stateObj.path || originalPath;
-    } catch(e) {}
+    } catch(e) { /* ignore malformed state */ }
   }
-  
+
+  // Declare FRONTEND_URL before try so catch block can access it (bug fix #2)
+  const FRONTEND_URL = isLocal
+    ? 'http://localhost:3001'
+    : (process.env.FRONTEND_URL || 'https://provn.live');
+
   try {
-    const baseUrl = isLocal ? 'http://localhost:3000' : (process.env.BASE_URL || 'https://api.provn.live');
+    const baseUrl = isLocal
+      ? 'http://localhost:3000'
+      : (process.env.BASE_URL || 'https://api.provn.live');
     const redirectUri = `${baseUrl}/auth/github/callback`;
-    const FRONTEND_URL = isLocal ? 'http://localhost:3001' : (process.env.FRONTEND_URL || 'https://provn.live');
 
     const tokenData = await githubService.getGithubAccessToken(code, redirectUri);
     const accessToken = tokenData.access_token;
-    
+
     if (!accessToken) {
       throw new Error('No access token received from GitHub');
     }
@@ -399,17 +429,17 @@ async function githubCallback(req, res) {
     let isNewUser = false;
 
     if (!user) {
-      // Create new user with student role
       const { rows: newRows } = await pool.query(
         `INSERT INTO users (email, name, role, avatar_url, password_hash, github_id, github_username, github_access_token)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
-        [email.toLowerCase(), name, 'student', picture, 'oauth_placeholder', githubUser.id.toString(), githubUser.login, accessToken]
+        [email.toLowerCase(), name, 'student', picture, 'oauth_placeholder',
+         githubUser.id.toString(), githubUser.login, accessToken]
       );
       user = newRows[0];
       isNewUser = true;
     } else {
-      // Update github token just in case
+      // Update github token and identifiers
       await pool.query(
         `UPDATE users SET github_id = $1, github_username = $2, github_access_token = $3, updated_at = NOW() WHERE id = $4`,
         [githubUser.id.toString(), githubUser.login, accessToken, user.id]
@@ -432,4 +462,3 @@ module.exports = {
   updateProfile, updateOnboarding, upgradeToPro,
   googleAuth, googleCallback, githubAuth, githubCallback
 };
-
