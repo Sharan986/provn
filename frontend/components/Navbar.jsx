@@ -18,6 +18,7 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -32,11 +33,13 @@ export default function Navbar() {
           setUser(null);
           setRole(null);
         }
+        setAuthChecked(true);
       }
     }).catch(() => {
       if (mounted) {
         setUser(null);
         setRole(null);
+        setAuthChecked(true);
       }
     });
 
@@ -104,9 +107,9 @@ export default function Navbar() {
             })}
           </div>
 
-          {/* Right Actions */}
+          {/* Right Actions — hidden until auth check completes to prevent flash */}
           <div className="hidden md:flex items-center gap-3">
-            {isLoggedIn ? (
+            {!authChecked ? null : isLoggedIn ? (
               <>
                 {user?.profile?.subscription_tier !== 'pro' && (
                   <Link href="/pricing">
@@ -173,7 +176,7 @@ export default function Navbar() {
               );
             })}
             <div className="px-4 pt-3 flex flex-col gap-2">
-              {isLoggedIn ? (
+              {!authChecked ? null : isLoggedIn ? (
                 <Button variant="dark" size="sm" fullWidth icon={LogOut} onClick={handleSignOut}>
                   Logout
                 </Button>

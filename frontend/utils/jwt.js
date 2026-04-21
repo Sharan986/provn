@@ -10,7 +10,14 @@ export function decodeJwt(token) {
         .join('')
     );
 
-    return JSON.parse(jsonPayload);
+    const payload = JSON.parse(jsonPayload);
+
+    // Check if token has expired
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      return null;
+    }
+
+    return payload;
   } catch (error) {
     return null;
   }
