@@ -81,8 +81,19 @@ export async function signOut() {
 }
 
 export async function getCurrentUser() {
-  // We can fetch from /api/auth/me but it's simpler if the backend just resolves user inside apiFetch
-  const { data, error } = await apiFetch('/auth/me', { method: 'GET', cache: 'no-store' });
+  const cookieStore = await cookies();
+  const hasToken = !!cookieStore.get('provn_access')?.value;
+
+  const { data, error, response } = await apiFetch('/auth/me', { method: 'GET', cache: 'no-store' });
+
+  // If we had a token but the backend rejected it (401), clear stale cookies
+  // This prevents the middleware from thinking we're logged in on the next request
+  if (hasToken && (error || !data || data.error || response?.status === 401)) {
+    cookieStore.delete('provn_access');
+    cookieStore.delete('provn_refresh');
+    return null;
+  }
+
   if (error || !data || data.error) return null;
 
   // Expected: { data: userObject }

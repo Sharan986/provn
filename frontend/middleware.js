@@ -9,6 +9,27 @@ export function middleware(request) {
   const user = token ? decodeJwt(token) : null;
   const role = user?.role || 'student';
 
+  // If token exists but is expired/invalid, clear stale cookies
+  if (token && !user) {
+    // For protected routes, redirect to auth
+    const protectedPaths = ['/dashboard', '/simulator', '/discover', '/tasks'];
+    const isProtected = protectedPaths.some((path) =>
+      request.nextUrl.pathname.startsWith(path)
+    );
+    if (isProtected) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/auth';
+      url.searchParams.set('mode', 'login');
+      const redirectResponse = NextResponse.redirect(url);
+      redirectResponse.cookies.delete('provn_access');
+      redirectResponse.cookies.delete('provn_refresh');
+      return redirectResponse;
+    }
+    // For other pages, just clear cookies and continue
+    response.cookies.delete('provn_access');
+    response.cookies.delete('provn_refresh');
+  }
+
   // Protected routes
   const protectedPaths = ['/dashboard', '/simulator', '/discover', '/tasks'];
   const isProtected = protectedPaths.some((path) =>
