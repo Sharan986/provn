@@ -22,7 +22,7 @@ const PORT = process.env.PORT || 3000;
 // Global Middleware
 // ──────────────────────────────────────────
 app.use(cors({
-  origin: "https://provn.live",
+  origin: [process.env.FRONTEND_URL || "https://provn.live", "http://localhost:3000", "http://localhost:3001"],
   credentials: true
 }));
 app.use(express.json());
@@ -31,15 +31,15 @@ app.use(cookieParser());
 // ──────────────────────────────────────────
 // Routes
 // ──────────────────────────────────────────
-app.use('/api/auth', authRoutes);
-app.use('/api/users', usersRoutes);
-app.use('/api/roadmaps', roadmapsRoutes);
-app.use('/api/tasks', tasksRoutes);
-app.use('/api/submissions', submissionsRoutes);
-app.use('/api/simulator', simulatorRoutes);
-app.use('/api/marketplace', marketplaceRoutes);
-app.use('/api/scores', scoresRoutes);
-app.use('/api/skills', skillTestsRoutes);
+app.use('/auth', authRoutes);
+app.use('/users', usersRoutes);
+app.use('/roadmaps', roadmapsRoutes);
+app.use('/tasks', tasksRoutes);
+app.use('/submissions', submissionsRoutes);
+app.use('/simulator', simulatorRoutes);
+app.use('/marketplace', marketplaceRoutes);
+app.use('/scores', scoresRoutes);
+app.use('/skills', skillTestsRoutes);
 
 // Health check
 app.get('/health', (_req, res) =>

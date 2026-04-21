@@ -4,7 +4,7 @@ import Button from './Button';
 const GoogleButton = ({ loading }) => {
   const handleGoogleLogin = () => {
     // Redirect to backend Google Auth route
-    window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/google`;
+    window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/auth/google`;
   };
 
   return (

@@ -258,7 +258,7 @@ export default function RoadmapFlowPage() {
       } else {
         if (result.error && result.error.includes('GitHub account not linked')) {
           toast.info('Redirecting to GitHub to link your account...');
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
           window.location.href = `${apiUrl}/auth/github`;
         } else {
           toast.error(result.error || 'Failed to provision repository.');
