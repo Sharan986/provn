@@ -82,8 +82,7 @@ function getDescriptionText(desc) {
   return '';
 }
 
-// Component: render a rich description in the side panel
-function SkillDescription({ description }) {
+function SkillDescription({ description, onSubtopicClick }) {
   const desc = parseDescription(description);
   const [expandedIdx, setExpandedIdx] = useState(null);
 
@@ -96,38 +95,74 @@ function SkillDescription({ description }) {
   }
 
   if (desc.type === 'subtopics' && desc.subtopics?.length) {
+    const sectionCount = desc.subtopics.filter(s => s.has_section).length;
     return (
       <div className="mt-3 space-y-1.5">
-        <span className="font-mono text-[10px] text-muted font-bold uppercase tracking-wider">
-          {desc.subtopics.length} Subtopics
-        </span>
-        {desc.subtopics.map((sub, i) => (
-          <div
-            key={i}
-            className="border-2 border-black bg-white overflow-hidden"
-          >
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setExpandedIdx(expandedIdx === i ? null : i);
-              }}
-              className="w-full px-3 py-2 flex items-center justify-between gap-2 hover:bg-bg-dark transition-colors text-left"
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-[10px] text-muted font-bold uppercase tracking-wider">
+            {desc.subtopics.length} Subtopics
+          </span>
+          {sectionCount > 0 && (
+            <span className="font-mono text-[9px] text-purple font-bold bg-purple/10 px-1.5 py-0.5 border border-purple/30 rounded">
+              {sectionCount} with sections
+            </span>
+          )}
+        </div>
+        {desc.subtopics.map((sub, i) => {
+          const hasSection = sub.has_section === true;
+          return (
+            <div
+              key={i}
+              className={`overflow-hidden transition-all ${
+                hasSection
+                  ? 'border-2 border-purple/60 bg-white shadow-[2px_2px_0_0_#7c3aed40]'
+                  : 'border-2 border-black/20 bg-[#fafafa]'
+              }`}
             >
-              <span className="font-bold text-xs uppercase tracking-tight">{sub.title}</span>
-              <ChevronDown
-                size={12}
-                className={`transition-transform shrink-0 ${expandedIdx === i ? 'rotate-180' : ''}`}
-              />
-            </button>
-            {expandedIdx === i && sub.description && (
-              <div className="px-3 pb-3 border-t border-black/10">
-                <p className="font-mono text-[11px] text-muted leading-relaxed mt-2">
-                  {sub.description}
-                </p>
-              </div>
-            )}
-          </div>
-        ))}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (hasSection && onSubtopicClick) {
+                    onSubtopicClick(sub);
+                  } else {
+                    setExpandedIdx(expandedIdx === i ? null : i);
+                  }
+                }}
+                className={`w-full px-3 py-2.5 flex items-center gap-2 transition-colors text-left ${
+                  hasSection
+                    ? 'hover:bg-purple/5'
+                    : 'hover:bg-bg-dark'
+                }`}
+              >
+                {/* Accent bar */}
+                <div className={`w-1 self-stretch flex-shrink-0 rounded-full ${
+                  hasSection ? 'bg-purple' : 'bg-gray-300'
+                }`} />
+                <span className={`font-bold text-xs uppercase tracking-tight flex-1 ${
+                  hasSection ? 'text-black' : 'text-black/70'
+                }`}>
+                  {sub.title}
+                </span>
+                {hasSection ? (
+                  <ChevronRight size={14} className="text-purple flex-shrink-0" />
+                ) : (
+                  <ChevronDown
+                    size={12}
+                    className={`transition-transform shrink-0 text-muted ${expandedIdx === i ? 'rotate-180' : ''}`}
+                  />
+                )}
+              </button>
+              {/* Inline expand for non-section subtopics */}
+              {!hasSection && expandedIdx === i && sub.description && (
+                <div className="px-3 pb-3 border-t border-black/10 ml-3">
+                  <p className="font-mono text-[11px] text-muted leading-relaxed mt-2">
+                    {sub.description}
+                  </p>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   }
@@ -158,6 +193,7 @@ export default function RoadmapFlowPage() {
 
   // Side panel state
   const [selectedSkill, setSelectedSkill] = useState(null);
+  const [selectedSubtopic, setSelectedSubtopic] = useState(null);
   const [panelOpen, setPanelOpen] = useState(false);
 
   // YouTube courses cache: { [skillId]: videosArray }
@@ -270,7 +306,7 @@ export default function RoadmapFlowPage() {
             ? 'in-progress'
             : 'pending',
         orderIndex: skill.order_index || index,
-        onClick: () => handleNodeClick(skill)
+        onClick: () => handleNodeClick(skill, null)
       },
     }));
 
@@ -291,8 +327,9 @@ export default function RoadmapFlowPage() {
     setEdges(flowEdges);
   }, [skills, progress]);
 
-  const handleNodeClick = useCallback((skill) => {
+  const handleNodeClick = useCallback((skill, subtopic = null) => {
     setSelectedSkill(skill);
+    setSelectedSubtopic(subtopic);
     setPanelOpen(true);
     setActiveTab('resources');
     // Bust the skill test cache so fresh score shows up if user retook a test
@@ -307,40 +344,35 @@ export default function RoadmapFlowPage() {
   useEffect(() => {
     async function fetchResources() {
       if (activeTab === 'resources' && selectedSkill) {
-        // Only fetch if we don't already have DB links in cache for this skill
-        if (dbLinksCache[selectedSkill.id] !== undefined) {
-          // If DB had no links, try YouTube as fallback (if not already cached)
-          if (dbLinksCache[selectedSkill.id].length === 0 && !youtubeCache[selectedSkill.id]) {
-            setLoadingVideos(true);
-            const result = await searchYouTubeCourses(selectedSkill.name);
-            if (result.data) {
-              setYoutubeCache(prev => ({ ...prev, [selectedSkill.id]: result.data }));
-            }
-            setLoadingVideos(false);
-          }
-          return;
-        }
-
         setLoadingVideos(true);
-        // 1. Try curated DB links first
-        const dbRes = await getSkillResources(selectedSkill.id);
-        const dbLinks = dbRes.data || [];
-        setDbLinksCache(prev => ({ ...prev, [selectedSkill.id]: dbLinks }));
+        
+        let dbLinks = [];
+        if (!selectedSubtopic) {
+          if (dbLinksCache[selectedSkill.id] !== undefined) {
+            dbLinks = dbLinksCache[selectedSkill.id];
+          } else {
+            const dbRes = await getSkillResources(selectedSkill.id);
+            dbLinks = dbRes.data || [];
+            setDbLinksCache(prev => ({ ...prev, [selectedSkill.id]: dbLinks }));
+          }
+        }
 
-        if (dbLinks.length === 0) {
-          // 2. Fallback: YouTube API
-          if (!youtubeCache[selectedSkill.id]) {
-            const result = await searchYouTubeCourses(selectedSkill.name);
+        if (dbLinks.length === 0 || selectedSubtopic) {
+          const cacheKey = selectedSubtopic ? `${selectedSkill.id}-${selectedSubtopic.title}` : selectedSkill.id;
+          if (!youtubeCache[cacheKey]) {
+            const query = selectedSubtopic ? `${selectedSkill.name} ${selectedSubtopic.title} tutorial` : `${selectedSkill.name} tutorial`;
+            const result = await searchYouTubeCourses(query);
             if (result.data) {
-              setYoutubeCache(prev => ({ ...prev, [selectedSkill.id]: result.data }));
+              setYoutubeCache(prev => ({ ...prev, [cacheKey]: result.data }));
             }
           }
         }
+        
         setLoadingVideos(false);
       }
     }
     fetchResources();
-  }, [activeTab, selectedSkill, dbLinksCache, youtubeCache]);
+  }, [activeTab, selectedSkill, selectedSubtopic, dbLinksCache, youtubeCache]);
 
   const diffColor = (d) => d === 'beginner' ? 'lime' : d === 'intermediate' ? 'yellow' : 'purple';
 
@@ -548,7 +580,7 @@ export default function RoadmapFlowPage() {
               skills={skills}
               progress={progress}
               onSkillClick={(skill, subtopic) => {
-                handleNodeClick(skill);
+                handleNodeClick(skill, subtopic);
               }}
             />
           </div>
@@ -832,40 +864,75 @@ export default function RoadmapFlowPage() {
           {selectedSkill && (
             <>
               {/* Panel Header */}
-              <div className="p-4 border-b-4 border-black bg-gradient-to-br from-purple/10 to-transparent">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <Badge variant="purple" size="sm" className="mb-2">
-                      <BookOpen size={10} className="mr-1" />
-                      SKILL {(selectedSkill.order_index || 0) + 1} OF {skills.length}
-                    </Badge>
-                    <h2 className="heading-brutal text-xl leading-tight">{selectedSkill.name}</h2>
-                    {selectedSkill.description && (
-                      <SkillDescription description={selectedSkill.description} />
+              <div className={`p-4 border-b-4 border-black relative ${
+                selectedSubtopic 
+                  ? 'bg-gradient-to-br from-purple/15 via-purple/5 to-transparent' 
+                  : 'bg-gradient-to-br from-purple/10 to-transparent'
+              }`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    {/* Breadcrumb for subtopic view */}
+                    {selectedSubtopic ? (
+                      <>
+                        <button 
+                          onClick={() => setSelectedSubtopic(null)}
+                          className="flex items-center gap-1.5 mb-3 group"
+                        >
+                          <ArrowLeft size={14} className="text-purple group-hover:-translate-x-0.5 transition-transform" />
+                          <span className="font-mono text-[11px] font-bold text-purple uppercase tracking-wider group-hover:underline">
+                            {selectedSkill.name}
+                          </span>
+                        </button>
+                        <Badge variant="purple" size="sm" className="mb-2">
+                          <ChevronRight size={8} className="mr-1" />
+                          SUBTOPIC
+                        </Badge>
+                        <h2 className="heading-brutal text-lg sm:text-xl leading-tight">
+                          {selectedSubtopic.title}
+                        </h2>
+                        {selectedSubtopic.description && (
+                          <p className="font-mono text-xs text-muted mt-2 leading-relaxed line-clamp-3">
+                            {selectedSubtopic.description}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <Badge variant="purple" size="sm" className="mb-2">
+                          <BookOpen size={10} className="mr-1" />
+                          SKILL {(selectedSkill.order_index || 0) + 1} OF {skills.length}
+                        </Badge>
+                        <h2 className="heading-brutal text-lg sm:text-xl leading-tight">{selectedSkill.name}</h2>
+                        {selectedSkill.description && (
+                          <SkillDescription description={selectedSkill.description} onSubtopicClick={(sub) => setSelectedSubtopic(sub)} />
+                        )}
+                      </>
                     )}
                   </div>
                   <button
                     onClick={() => setPanelOpen(false)}
-                    className="p-2 bg-white border-2 border-black shadow-brutal-xs hover:shadow-brutal hover:-translate-y-0.5 transition-all"
+                    className="p-2 bg-white border-2 border-black shadow-brutal-xs hover:shadow-brutal hover:-translate-y-0.5 transition-all flex-shrink-0"
                   >
                     <X size={16} />
                   </button>
                 </div>
 
-                {/* Skill progress indicator — show test score if available */}
-                <div className="mt-4 flex items-center gap-3">
-                  <div className="flex-1 h-2 bg-bg-dark border border-black overflow-hidden">
-                    <div
-                      className="h-full bg-purple transition-all"
-                      style={{
-                        width: `${skillTestCache[selectedSkill?.id]?.bestPercentage || 0}%`
-                      }}
-                    />
+                {/* Skill progress indicator — only show for main skill view */}
+                {!selectedSubtopic && (
+                  <div className="mt-4 flex items-center gap-3">
+                    <div className="flex-1 h-2 bg-bg-dark border border-black overflow-hidden">
+                      <div
+                        className="h-full bg-purple transition-all"
+                        style={{
+                          width: `${skillTestCache[selectedSkill?.id]?.bestPercentage || 0}%`
+                        }}
+                      />
+                    </div>
+                    <span className="font-mono text-xs font-bold">
+                      {skillTestCache[selectedSkill?.id]?.bestPercentage || 0}% tested
+                    </span>
                   </div>
-                  <span className="font-mono text-xs font-bold">
-                    {skillTestCache[selectedSkill?.id]?.bestPercentage || 0}% tested
-                  </span>
-                </div>
+                )}
               </div>
 
               {/* Tab Navigation — Learn & Test only */}
@@ -904,7 +971,7 @@ export default function RoadmapFlowPage() {
                         Loading resources...
                       </span>
                     </div>
-                  ) : dbLinksCache[selectedSkill.id]?.length > 0 ? (
+                  ) : !selectedSubtopic && dbLinksCache[selectedSkill.id]?.length > 0 ? (
                     <div className="flex flex-col gap-4">
                       <div className="bg-black text-white p-3 font-mono text-xs font-bold uppercase flex items-center gap-2">
                         <BookOpen size={16} className="text-lime" />
@@ -977,13 +1044,13 @@ export default function RoadmapFlowPage() {
                         </a>
                       ))}
                     </div>
-                  ) : youtubeCache[selectedSkill.id]?.length > 0 ? (
+                  ) : youtubeCache[selectedSubtopic ? `${selectedSkill.id}-${selectedSubtopic.title}` : selectedSkill.id]?.length > 0 ? (
                     <div className="flex flex-col gap-4">
                       <div className="bg-black text-white p-3 font-mono text-xs font-bold uppercase flex items-center gap-2">
                         <Youtube size={16} className="text-red-500" />
-                        Top Tutorials for {selectedSkill.name}
+                        Top Tutorials for {selectedSubtopic ? selectedSubtopic.title : selectedSkill.name}
                       </div>
-                      {youtubeCache[selectedSkill.id].map((video, index) => (
+                      {youtubeCache[selectedSubtopic ? `${selectedSkill.id}-${selectedSubtopic.title}` : selectedSkill.id].map((video, index) => (
                         <a
                           key={video.id}
                           href={video.url}
@@ -1226,7 +1293,7 @@ function TestTabContent({ selectedSkill, isPro, router, toast, skillTestCache, s
                     Project {proj.project_order}
                   </Badge>
                   <Badge variant={isUnlocked ? 'lime' : 'default'} size="sm">
-                    {isUnlocked ? '🔓 Unlocked' : `🔒 ≥${proj.unlock_threshold}%`}
+                    {isUnlocked ? '🔓 Unlocked' : '🔒 Locked (Take Test)'}
                   </Badge>
                   <span className="ml-auto font-mono text-[10px] font-bold text-muted">
                     {proj.points} pts
@@ -1238,33 +1305,33 @@ function TestTabContent({ selectedSkill, isPro, router, toast, skillTestCache, s
                 {isUnlocked && (
                   <div className="mt-2">
                     {proj.submission?.status === 'approved' ? (
-                      <div className="flex items-center gap-2 bg-lime/30 border-2 border-lime px-3 py-2">
+                      <div className="flex items-center gap-2 bg-lime/30 border-2 border-lime px-3 py-2 mb-2">
                         <CheckCircle size={12} />
                         <span className="font-mono text-xs font-bold">Completed</span>
                       </div>
                     ) : proj.submission?.status === 'pending' ? (
-                      <div className="flex items-center gap-2 bg-yellow/30 border-2 border-yellow px-3 py-2">
+                      <div className="flex items-center gap-2 bg-yellow/30 border-2 border-yellow px-3 py-2 mb-2">
                         <Loader2 size={12} className="animate-spin" />
                         <span className="font-mono text-xs font-bold">Under Review</span>
                       </div>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        fullWidth
-                        icon={Send}
-                        onClick={() => {
-                          if (!isPro) {
-                            toast.error('Pro Feature: Upgrade to submit projects');
-                          } else {
-                            toast.info('Project submission coming soon!');
-                          }
-                        }}
-                        disabled={!isPro}
-                      >
-                        Submit Project
-                      </Button>
-                    )}
+                    ) : null}
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      fullWidth
+                      icon={ChevronRight}
+                      onClick={() => {
+                        if (!isPro) {
+                          toast.error('Pro Feature: Upgrade to view projects');
+                        } else {
+                          router.push(`/project/${proj.id}`);
+                        }
+                      }}
+                      disabled={!isPro}
+                    >
+                      View Project
+                    </Button>
                   </div>
                 )}
 
@@ -1281,41 +1348,13 @@ function TestTabContent({ selectedSkill, isPro, router, toast, skillTestCache, s
           })}
         </div>
       ) : (
-        /* Fallback placeholder projects when none exist in DB yet */
-        <div className="flex flex-col gap-3 relative">
-          {[
-            { title: 'Beginner Project', req: 33, order: 1, color: 'lime' },
-            { title: 'Intermediate Project', req: 66, order: 2, color: 'yellow' },
-            { title: 'Advanced Project', req: 85, order: 3, color: 'purple' },
-          ].map((proj) => {
-            const isUnlocked = bestPercentage >= proj.req;
-            return (
-              <div 
-                key={proj.order} 
-                className={`p-4 border-3 border-black transition-all ${
-                  isUnlocked 
-                    ? 'bg-white shadow-brutal' 
-                    : 'bg-bg-dark opacity-60 blur-[1.5px] pointer-events-none'
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant={proj.color} size="sm">Project {proj.order}</Badge>
-                  <Badge variant={isUnlocked ? 'lime' : 'default'} size="sm">
-                    {isUnlocked ? '🔓 Unlocked' : `≥${proj.req}%`}
-                  </Badge>
-                </div>
-                <h5 className="font-black text-sm uppercase mb-1">{proj.title}</h5>
-                <p className="font-mono text-[10px] text-muted">
-                  {isUnlocked ? 'Placeholder project ready! (Coming soon to DB)' : 'Take the test first to see project details.'}
-                </p>
-                {isUnlocked && (
-                  <Button variant="outline" size="sm" className="mt-3 pointer-events-none opacity-50">
-                    Submission Pending DB Seed
-                  </Button>
-                )}
-              </div>
-            );
-          })}
+        /* Empty state when no projects exist */
+        <div className="flex flex-col items-center justify-center p-6 border-3 border-black bg-bg-dark text-center">
+          <span className="text-4xl mb-3">💀</span>
+          <h5 className="font-black text-sm uppercase mb-1">It&apos;s giving... nothing.</h5>
+          <p className="font-mono text-xs text-muted">
+            Fr fr, there are no projects for this node yet. The devs are cooking, hold tight! 👨‍🍳🔥
+          </p>
         </div>
       )}
     </div>

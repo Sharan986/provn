@@ -45,9 +45,10 @@ async function getSkillProjects(req, res) {
     }
 
     // Add lock/unlock status and submission info to each project
+    // As per user request, taking the test (bestPercentage > 0) unlocks all 3 projects.
     const enrichedProjects = projects.map(project => ({
       ...project,
-      isUnlocked: bestPercentage >= project.unlock_threshold,
+      isUnlocked: bestPercentage > 0,
       submission: submissionMap[project.id] || null,
     }));
 
@@ -63,6 +64,62 @@ async function getSkillProjects(req, res) {
   } catch (err) {
     console.error('getSkillProjects error:', err);
     return res.status(500).json({ error: 'Failed to fetch skill projects' });
+  }
+}
+
+/**
+ * GET /api/skills/projects/:projectId
+ * Returns single project details and submission info
+ */
+async function getProjectDetails(req, res) {
+  const projectId = req.params.projectId;
+
+  try {
+    const { rows: projects } = await pool.query(
+      `SELECT sp.*, s.name as skill_name 
+       FROM skill_projects sp
+       JOIN skills s ON sp.skill_id = s.id
+       WHERE sp.id = $1`,
+      [projectId]
+    );
+
+    if (!projects.length) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    const project = projects[0];
+
+    // Get user's submission for this project
+    const { rows: submissions } = await pool.query(
+      `SELECT * FROM skill_project_submissions
+       WHERE user_id = $1 AND project_id = $2`,
+      [req.user.id, projectId]
+    );
+
+    const submission = submissions.length ? submissions[0] : null;
+
+    // Check unlock status using best skill test percentage (taking the test unlocks it)
+    const { rows: scoreRows } = await pool.query(
+      `SELECT COALESCE(MAX(percentage), 0) AS best_percentage
+       FROM skill_test_attempts
+       WHERE user_id = $1 AND skill_id = $2`,
+      [req.user.id, project.skill_id]
+    );
+    const bestPercentage = parseFloat(scoreRows[0].best_percentage);
+    const isUnlocked = bestPercentage > 0;
+
+    return res.json({
+      data: {
+        project: {
+          ...project,
+          isUnlocked,
+          submission
+        }
+      }
+    });
+  } catch (err) {
+    console.error('getProjectDetails error:', err);
+    return res.status(500).json({ error: 'Failed to fetch project details' });
   }
 }
 
@@ -89,7 +146,7 @@ async function submitProject(req, res) {
       return res.status(404).json({ error: 'Project not found' });
     }
 
-    // Check user's best score meets the threshold
+    // Check user's best score meets the threshold (just taking the test unlocks it now)
     const { rows: scoreRows } = await pool.query(
       `SELECT COALESCE(MAX(percentage), 0) AS best_percentage
        FROM skill_test_attempts
@@ -98,9 +155,9 @@ async function submitProject(req, res) {
     );
     const bestPercentage = parseFloat(scoreRows[0].best_percentage);
 
-    if (bestPercentage < projectRows[0].unlock_threshold) {
+    if (bestPercentage <= 0) {
       return res.status(403).json({
-        error: `You need at least ${projectRows[0].unlock_threshold}% on the skill test to unlock this project. Your best: ${bestPercentage}%`
+        error: `You need to take the skill test to unlock projects.`
       });
     }
 
@@ -209,6 +266,7 @@ async function deleteProject(req, res) {
 
 module.exports = {
   getSkillProjects,
+  getProjectDetails,
   submitProject,
   createProject,
   updateProject,

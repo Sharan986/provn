@@ -16,6 +16,7 @@ const {
 } = require('../controllers/skillTestController');
 const {
   getSkillProjects,
+  getProjectDetails,
   submitProject,
   createProject,
   updateProject,
@@ -36,6 +37,7 @@ router.get('/:skillId/test/best',     requireAuth, getBestScore);
 
 // ─── Student: Projects ────────────────────────────────────────────────────────
 router.get('/:skillId/projects',            requireAuth, getSkillProjects);
+router.get('/projects/:projectId',          requireAuth, getProjectDetails);
 router.post('/:skillId/projects/:id/submit', requireAuth, requirePro, submitProject);
 
 // ─── Admin: MCQs ──────────────────────────────────────────────────────────────

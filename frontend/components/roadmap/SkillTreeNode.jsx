@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState } from 'react';
-import { CheckCircle, Clock, Circle, ChevronDown } from 'lucide-react';
+import { CheckCircle, Clock, Circle, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 
 /**
  * Super robust parser for JSON from Postgres TEXT columns
@@ -107,49 +107,68 @@ function SkillTreeNode({ skill, status, onClick, isLast, index }) {
             }`}
           >
             {/* Primary Horizontal Branch */}
-            <div className="w-12 border-t-2 border-dashed border-blue-500" />
+            <div className="w-12 border-t-2 border-dashed border-purple/40" />
 
             {/* Subtopics Vertical Group */}
-            <div className="relative py-4 flex flex-col gap-2">
+            <div className="relative py-3 flex flex-col gap-1.5">
               
               {/* Vertical Branch Line */}
               <div 
-                className={`absolute top-4 bottom-4 border-dashed border-blue-500 ${
+                className={`absolute top-3 bottom-3 border-dashed border-purple/40 ${
                   isRight ? 'left-0 border-l-2' : 'right-0 border-r-2'
                 }`}
               />
 
-              {desc.subtopics.map((sub, i) => (
-                <div 
-                  key={i} 
-                  className={`relative flex items-center ${isRight ? 'flex-row' : 'flex-row-reverse'}`}
-                >
-                  {/* Small connector to subtopic */}
-                  <div className={`w-6 border-t-2 border-dashed border-blue-500 ${
-                    isRight ? '-ml-[2px]' : '-mr-[2px]'
-                  }`} />
-                  
-                  {/* Subtopic Box */}
-                  <div
-                    className="
-                      bg-[#fffae6] border-2 border-black px-3 py-1.5 cursor-pointer 
-                      shadow-[2px_2px_0_0_#000] hover:bg-yellow hover:translate-x-0.5 transition-all
-                      whitespace-nowrap flex items-center
-                    "
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onClick(skill, sub);
-                    }}
+              {desc.subtopics.map((sub, i) => {
+                const hasSection = sub.has_section === true;
+                return (
+                  <div 
+                    key={i} 
+                    className={`relative flex items-center ${isRight ? 'flex-row' : 'flex-row-reverse'}`}
                   >
-                    <div className={`w-1 h-full absolute top-0 bottom-0 bg-purple ${
-                      isRight ? 'left-0' : 'right-0'
+                    {/* Small connector to subtopic */}
+                    <div className={`w-5 border-t-2 border-dashed border-purple/40 ${
+                      isRight ? '-ml-[2px]' : '-mr-[2px]'
                     }`} />
-                    <span className="font-bold text-xs uppercase tracking-tight z-10 px-1">
-                      {sub.title}
-                    </span>
+                    
+                    {/* Subtopic Box — visual distinction for has_section */}
+                    <div
+                      className={`
+                        relative border-2 border-black px-3 py-1.5 cursor-pointer 
+                        transition-all whitespace-nowrap flex items-center gap-1.5
+                        ${hasSection 
+                          ? 'bg-white shadow-[3px_3px_0_0_#7c3aed] hover:shadow-[4px_4px_0_0_#7c3aed] hover:-translate-y-0.5 hover:-translate-x-0.5' 
+                          : 'bg-[#f5f5f5] shadow-[2px_2px_0_0_#000] hover:bg-[#eee] hover:translate-x-0.5'
+                        }
+                      `}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (hasSection) {
+                          onClick(skill, sub);
+                        } else {
+                          onClick(skill);
+                        }
+                      }}
+                    >
+                      {/* Left accent bar */}
+                      <div className={`w-1 h-full absolute top-0 bottom-0 ${
+                        hasSection ? 'bg-purple' : 'bg-gray-400'
+                      } ${isRight ? 'left-0' : 'right-0'}`} />
+                      
+                      <span className={`font-bold text-xs uppercase tracking-tight z-10 ${
+                        isRight ? 'pl-1.5' : 'pr-1.5'
+                      }`}>
+                        {sub.title}
+                      </span>
+
+                      {/* Section indicator icon */}
+                      {hasSection && (
+                        <ChevronRight size={10} className="text-purple flex-shrink-0" />
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -159,28 +178,42 @@ function SkillTreeNode({ skill, status, onClick, isLast, index }) {
       {hasSubtopics && mobileExpanded && (
         <div className="md:hidden w-full max-w-[320px] flex flex-col gap-1.5 -mt-4 mb-2 pl-8 relative">
           {/* Left border line for visual grouping */}
-          <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-blue-400" />
-          {desc.subtopics.map((sub, i) => (
-            <div
-              key={i}
-              className="
-                relative bg-[#fffae6] border-2 border-black px-3 py-2 cursor-pointer 
-                shadow-[2px_2px_0_0_#000] active:translate-x-0.5 transition-all
-                flex items-center
-              "
-              onClick={(e) => {
-                e.stopPropagation();
-                onClick(skill, sub);
-              }}
-            >
-              {/* Left connector line */}
-              <div className="absolute -left-4 top-1/2 w-4 border-t-2 border-dashed border-blue-400" />
-              <div className="w-1 absolute left-0 top-0 bottom-0 bg-purple" />
-              <span className="font-bold text-[10px] uppercase tracking-tight pl-2">
-                {sub.title}
-              </span>
-            </div>
-          ))}
+          <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-purple/40" />
+          {desc.subtopics.map((sub, i) => {
+            const hasSection = sub.has_section === true;
+            return (
+              <div
+                key={i}
+                className={`
+                  relative border-2 border-black px-3 py-2.5 cursor-pointer 
+                  transition-all flex items-center justify-between
+                  ${hasSection 
+                    ? 'bg-white shadow-[3px_3px_0_0_#7c3aed] active:-translate-y-0.5' 
+                    : 'bg-[#f5f5f5] shadow-[2px_2px_0_0_#000] active:translate-x-0.5'
+                  }
+                `}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (hasSection) {
+                    onClick(skill, sub);
+                  } else {
+                    onClick(skill);
+                  }
+                }}
+              >
+                {/* Left connector line */}
+                <div className="absolute -left-4 top-1/2 w-4 border-t-2 border-dashed border-purple/40" />
+                {/* Left accent bar */}
+                <div className={`w-1 absolute left-0 top-0 bottom-0 ${hasSection ? 'bg-purple' : 'bg-gray-400'}`} />
+                <span className="font-bold text-[11px] uppercase tracking-tight pl-2 flex-1">
+                  {sub.title}
+                </span>
+                {hasSection && (
+                  <ChevronRight size={12} className="text-purple flex-shrink-0 ml-1" />
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

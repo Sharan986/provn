@@ -50,6 +50,12 @@ CREATE TABLE IF NOT EXISTS skills (
   roadmap_id   UUID    NOT NULL REFERENCES roadmaps(id) ON DELETE CASCADE,
   name         TEXT    NOT NULL,
   description  JSONB,   -- Stores rich subtopics or simple text
+                        -- JSONB convention for subtopics:
+                        -- { "type": "subtopics", "subtopics": [
+                        --   { "title": "...", "description": "...", "has_section": true|false }
+                        -- ] }
+                        -- has_section: true = clicking opens a dedicated learning panel
+                        -- has_section: false = clicking expands description inline only
   position_x   FLOAT   DEFAULT 0,
   position_y   FLOAT   DEFAULT 0,
   order_index  INT     DEFAULT 0,
@@ -67,6 +73,8 @@ CREATE TABLE IF NOT EXISTS skill_resource_links (
   type        TEXT        CHECK (type IN ('video','article','docs','course')) DEFAULT 'video',
   source      TEXT,       -- e.g. "YouTube", "Medium"
   duration    TEXT,       -- e.g. "10:25"
+  thumbnail   TEXT,
+  order_index INT         DEFAULT 0,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -83,13 +91,16 @@ CREATE TABLE IF NOT EXISTS skill_mcqs (
 );
 
 CREATE TABLE IF NOT EXISTS skill_test_attempts (
-  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id         UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  skill_id        UUID        NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
-  score           INT         NOT NULL,
-  percentage      DECIMAL(5,2) NOT NULL,
-  answers         JSONB,      -- User's choices and correctness
-  created_at      TIMESTAMPTZ DEFAULT NOW()
+  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id             UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  skill_id            UUID        NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+  score               INT         NOT NULL,
+  total_questions     INT         DEFAULT 15,
+  percentage          DECIMAL(5,2) NOT NULL,
+  answers             JSONB,      -- User's choices and correctness
+  time_taken_seconds  INT,
+  completed_at        TIMESTAMPTZ DEFAULT NOW(),
+  created_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ─────────────────────────────────────────────

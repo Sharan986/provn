@@ -74,6 +74,15 @@ export async function getSkillProjects(skillId) {
 }
 
 /**
+ * Get details for a single project.
+ */
+export async function getSkillProjectDetails(projectId) {
+  const { data, error } = await apiFetch(`/skills/projects/${projectId}`, { method: 'GET' });
+  if (error) return { error };
+  return data;
+}
+
+/**
  * Submit work for a gated project.
  */
 export async function submitSkillProject(skillId, projectId, content) {

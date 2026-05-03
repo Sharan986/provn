@@ -108,7 +108,7 @@ const SEED_PROJECTS = [
     unlockThreshold: 33,
     projectOrder: 1,
     requirements: ['Use semantic HTML5 tags', 'Implement flexbox layout', 'Make it responsive', 'Include hover effects'],
-    templateRepoUrl: null  // TODO: create template repo e.g. "https://github.com/provn-org/profile-card-starter"
+    templateRepoUrl: 'https://github.com/Sharan986/test-repo.git'
   },
   {
     title: 'Responsive Landing Page',
@@ -118,7 +118,7 @@ const SEED_PROJECTS = [
     unlockThreshold: 66,
     projectOrder: 2,
     requirements: ['CSS Grid for layout', 'Mobile-first approach', 'Smooth scroll navigation', 'CSS animations', 'Dark/light sections'],
-    templateRepoUrl: null  // TODO: create template repo
+    templateRepoUrl: 'https://github.com/provn-org/landing-page-starter'
   },
   {
     title: 'Interactive Dashboard UI',
@@ -128,7 +128,7 @@ const SEED_PROJECTS = [
     unlockThreshold: 85,
     projectOrder: 3,
     requirements: ['Complex CSS Grid layout', 'Collapsible sidebar', 'Responsive data tables', 'CSS custom properties', 'Accessible navigation'],
-    templateRepoUrl: null  // TODO: create template repo
+    templateRepoUrl: 'https://github.com/provn-org/dashboard-starter'
   }
 ];
 
