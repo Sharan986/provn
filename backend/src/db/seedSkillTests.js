@@ -107,7 +107,8 @@ const SEED_PROJECTS = [
     points: 30,
     unlockThreshold: 33,
     projectOrder: 1,
-    requirements: ['Use semantic HTML5 tags', 'Implement flexbox layout', 'Make it responsive', 'Include hover effects']
+    requirements: ['Use semantic HTML5 tags', 'Implement flexbox layout', 'Make it responsive', 'Include hover effects'],
+    templateRepoUrl: null  // TODO: create template repo e.g. "https://github.com/provn-org/profile-card-starter"
   },
   {
     title: 'Responsive Landing Page',
@@ -116,7 +117,8 @@ const SEED_PROJECTS = [
     points: 60,
     unlockThreshold: 66,
     projectOrder: 2,
-    requirements: ['CSS Grid for layout', 'Mobile-first approach', 'Smooth scroll navigation', 'CSS animations', 'Dark/light sections']
+    requirements: ['CSS Grid for layout', 'Mobile-first approach', 'Smooth scroll navigation', 'CSS animations', 'Dark/light sections'],
+    templateRepoUrl: null  // TODO: create template repo
   },
   {
     title: 'Interactive Dashboard UI',
@@ -125,7 +127,8 @@ const SEED_PROJECTS = [
     points: 100,
     unlockThreshold: 85,
     projectOrder: 3,
-    requirements: ['Complex CSS Grid layout', 'Collapsible sidebar', 'Responsive data tables', 'CSS custom properties', 'Accessible navigation']
+    requirements: ['Complex CSS Grid layout', 'Collapsible sidebar', 'Responsive data tables', 'CSS custom properties', 'Accessible navigation'],
+    templateRepoUrl: null  // TODO: create template repo
   }
 ];
 
@@ -175,9 +178,9 @@ async function seed() {
     } else {
       for (const proj of SEED_PROJECTS) {
         await pool.query(
-          `INSERT INTO skill_projects (skill_id, title, description, difficulty, points, unlock_threshold, project_order, requirements)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [skillId, proj.title, proj.description, proj.difficulty, proj.points, proj.unlockThreshold, proj.projectOrder, JSON.stringify(proj.requirements)]
+          `INSERT INTO skill_projects (skill_id, title, description, difficulty, points, unlock_threshold, project_order, requirements, template_repo_url)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [skillId, proj.title, proj.description, proj.difficulty, proj.points, proj.unlockThreshold, proj.projectOrder, JSON.stringify(proj.requirements), proj.templateRepoUrl || null]
         );
       }
       console.log(`  ✅ Inserted ${SEED_PROJECTS.length} projects`);

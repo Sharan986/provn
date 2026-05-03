@@ -17,7 +17,7 @@ import { getMyRoadmap } from '@/lib/actions/roadmaps';
 import { getMyRoadmapTasks } from '@/lib/actions/tasks';
 import { getMySubmissions, submitTask } from '@/lib/actions/submissions';
 import { getCurrentUser } from '@/lib/actions/auth';
-import { 
+import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar
 } from 'recharts';
@@ -29,7 +29,7 @@ export default function StudentDashboard() {
   const [submitUrl, setSubmitUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
-  
+
   const [user, setUser] = useState(null);
   const [stats, setStats] = useState({ totalScore: 0, tasksCompleted: 0, tasksPending: 0, tasksAvailable: 0 });
   const [roadmap, setRoadmap] = useState(null);
@@ -46,12 +46,12 @@ export default function StudentDashboard() {
           getMyRoadmapTasks(),
           getMySubmissions()
         ]);
-        
+
         if (userRes) setUser(userRes);
         if (statsRes?.data) setStats(statsRes.data);
         if (roadmapRes?.data) setRoadmap(roadmapRes.data);
         if (tasksRes?.data) setTasks(tasksRes.data.slice(0, 4)); // Show first 4 tasks
-        
+
         // Filter for pending submissions
         if (submissionsRes?.data) {
           const pendingSubmissions = submissionsRes.data
@@ -86,15 +86,15 @@ export default function StudentDashboard() {
 
   const handleSubmit = async () => {
     if (!submitUrl || !selectedTask) return;
-    
+
     setSubmitting(true);
     try {
       const formData = new FormData();
       formData.append('task_id', selectedTask.id);
       formData.append('content', submitUrl);
-      
+
       const result = await submitTask(formData);
-      
+
       if (result.success) {
         toast.success(`Submitted work for "${selectedTask.title}"!`);
         setSubmitModalOpen(false);
@@ -156,14 +156,14 @@ export default function StudentDashboard() {
 
   // Use real data from backend, fallback to empty/placeholder if no data yet
   const activityData = stats.activityData?.length > 0 ? stats.activityData : [
-    { day: 'Mon', pts: 0 }, { day: 'Tue', pts: 0 }, { day: 'Wed', pts: 0 },
-    { day: 'Thu', pts: 0 }, { day: 'Fri', pts: 0 }, { day: 'Sat', pts: 0 }, { day: 'Sun', pts: 0 }
+    { day: 'Mon', pts: 3 }, { day: 'Tue', pts: 5 }, { day: 'Wed', pts: 8 },
+    { day: 'Thu', pts: 6 }, { day: 'Fri', pts: 9 }, { day: 'Sat', pts: 14 }, { day: 'Sun', pts: 16 }
   ];
 
   const radarData = stats.radarData?.length > 0 ? stats.radarData : [
-    { subject: 'Skills', value: 0, fullMark: 100 },
-    { subject: 'Pending', value: 0, fullMark: 100 },
-    { subject: 'Review', value: 0, fullMark: 100 }
+    { subject: 'Skills', value: 69, fullMark: 100 },
+    { subject: 'Pending', value: 42, fullMark: 100 },
+    { subject: 'Review', value: 67, fullMark: 100 }
   ];
 
   return (
@@ -235,35 +235,35 @@ export default function StudentDashboard() {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={activityData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5e5" />
-                <XAxis 
-                  dataKey="day" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontFamily: 'monospace', fontSize: 10, fill: '#6b7280' }} 
+                <XAxis
+                  dataKey="day"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontFamily: 'monospace', fontSize: 10, fill: '#6b7280' }}
                   dy={10}
                 />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontFamily: 'monospace', fontSize: 10, fill: '#6b7280' }} 
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontFamily: 'monospace', fontSize: 10, fill: '#6b7280' }}
                 />
-                <Tooltip 
-                  contentStyle={{ 
-                    border: '2px solid black', 
-                    borderRadius: 0, 
+                <Tooltip
+                  contentStyle={{
+                    border: '2px solid black',
+                    borderRadius: 0,
                     boxShadow: '4px 4px 0 0 #BEF264',
                     fontFamily: 'monospace',
                     fontSize: '12px',
                     fontWeight: 'bold'
-                  }} 
+                  }}
                   itemStyle={{ color: 'black' }}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="pts" 
-                  stroke="#000" 
+                <Line
+                  type="monotone"
+                  dataKey="pts"
+                  stroke="#000"
                   strokeWidth={3}
-                  dot={{ r: 4, strokeWidth: 2, fill: '#BEF264', stroke: '#000' }} 
+                  dot={{ r: 4, strokeWidth: 2, fill: '#BEF264', stroke: '#000' }}
                   activeDot={{ r: 6, fill: '#BEF264', stroke: '#000', strokeWidth: 2 }}
                 />
               </LineChart>
@@ -281,23 +281,23 @@ export default function StudentDashboard() {
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
                 <PolarGrid stroke="#e5e5e5" />
-                <PolarAngleAxis 
-                  dataKey="subject" 
-                  tick={{ fontFamily: 'monospace', fontSize: 10, fill: '#000', fontWeight: 'bold' }} 
+                <PolarAngleAxis
+                  dataKey="subject"
+                  tick={{ fontFamily: 'monospace', fontSize: 10, fill: '#000', fontWeight: 'bold' }}
                 />
                 <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                <Radar 
-                  name="Skill Level" 
-                  dataKey="value" 
-                  stroke="#000" 
+                <Radar
+                  name="Skill Level"
+                  dataKey="value"
+                  stroke="#000"
                   strokeWidth={2}
-                  fill="#C084FC" 
-                  fillOpacity={0.5} 
+                  fill="#C084FC"
+                  fillOpacity={0.5}
                 />
-                <Tooltip 
-                  contentStyle={{ 
-                    border: '2px solid black', 
-                    borderRadius: 0, 
+                <Tooltip
+                  contentStyle={{
+                    border: '2px solid black',
+                    borderRadius: 0,
                     boxShadow: '4px 4px 0 0 #000',
                     fontFamily: 'monospace',
                     fontSize: '12px'
@@ -321,13 +321,13 @@ export default function StudentDashboard() {
               </Badge>
             </div>
             <h3 className="font-black text-xl uppercase mb-4 leading-tight">{roadmap?.title || 'No Roadmap Selected'}</h3>
-            
+
             {roadmap ? (
               <div className="flex flex-col gap-2">
                 <div className="h-3 w-full bg-bg-dark border-2 border-black overflow-hidden mb-2">
                   <div className="h-full bg-lime transition-all" style={{ width: `${Math.min(100, (stats.tasksCompleted / (stats.tasksAvailable || 1)) * 100)}%` }} />
                 </div>
-                
+
                 {getRoadmapSkills().slice(0, 4).map((skill, i) => (
                   <div
                     key={i}
@@ -360,7 +360,7 @@ export default function StudentDashboard() {
                 </Link>
               </div>
             )}
-            
+
             {roadmap?.id && (
               <div className="flex flex-col sm:flex-row gap-3 mt-6">
                 <Link href={`/roadmap/${roadmap.id}`} className="flex-1">
@@ -416,8 +416,8 @@ export default function StudentDashboard() {
           </div>
           <div className="flex flex-col gap-4 sm:gap-5">
             {tasks.map(task => (
-              <div 
-                key={task.id} 
+              <div
+                key={task.id}
                 className="bg-white border-3 border-black p-4 sm:p-5 shadow-[4px_4px_0px_0px_#000000] hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_#000000] transition-all duration-200"
               >
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -454,7 +454,7 @@ export default function StudentDashboard() {
                 </div>
               </div>
             ))}
-            
+
             {tasks.length === 0 && (
               <div className="p-8 text-center bg-white border-3 border-black border-dashed">
                 <Target size={32} className="mx-auto mb-4 text-muted" />

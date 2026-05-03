@@ -104,13 +104,16 @@ async function submitProject(req, res) {
       });
     }
 
+    const githubRepoUrl = req.body.githubRepoUrl || null;
+    const reviewMethod = req.body.reviewMethod || 'manual';
+
     // Upsert submission (one per user per project)
     const { rows } = await pool.query(
-      `INSERT INTO skill_project_submissions (project_id, user_id, content)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (project_id, user_id) DO UPDATE SET content = $3, status = 'pending', created_at = NOW()
+      `INSERT INTO skill_project_submissions (project_id, user_id, content, github_repo_url, review_method)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (project_id, user_id) DO UPDATE SET content = $3, github_repo_url = $4, review_method = $5, status = 'pending', created_at = NOW()
        RETURNING id`,
-      [projectId, req.user.id, content]
+      [projectId, req.user.id, content, githubRepoUrl, reviewMethod]
     );
 
     return res.status(201).json({ success: true, data: { submissionId: rows[0].id } });
@@ -127,7 +130,7 @@ async function submitProject(req, res) {
  * Body: { title, description, difficulty, points, unlockThreshold, projectOrder, requirements }
  */
 async function createProject(req, res) {
-  const { title, description, difficulty, points, unlockThreshold, projectOrder, requirements } = req.body;
+  const { title, description, difficulty, points, unlockThreshold, projectOrder, requirements, templateRepoUrl } = req.body;
   const skillId = req.params.skillId;
 
   if (!title || !unlockThreshold || !projectOrder) {
@@ -136,10 +139,10 @@ async function createProject(req, res) {
 
   try {
     const { rows } = await pool.query(
-      `INSERT INTO skill_projects (skill_id, title, description, difficulty, points, unlock_threshold, project_order, requirements)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO skill_projects (skill_id, title, description, difficulty, points, unlock_threshold, project_order, requirements, template_repo_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING id`,
-      [skillId, title, description || null, difficulty || 'beginner', points || 50, unlockThreshold, projectOrder, requirements ? JSON.stringify(requirements) : null]
+      [skillId, title, description || null, difficulty || 'beginner', points || 50, unlockThreshold, projectOrder, requirements ? JSON.stringify(requirements) : null, templateRepoUrl || null]
     );
 
     return res.status(201).json({ success: true, data: { projectId: rows[0].id } });
@@ -153,7 +156,7 @@ async function createProject(req, res) {
  * PUT /api/projects/:projectId
  */
 async function updateProject(req, res) {
-  const { title, description, difficulty, points, unlockThreshold, projectOrder, requirements } = req.body;
+  const { title, description, difficulty, points, unlockThreshold, projectOrder, requirements, templateRepoUrl } = req.body;
 
   try {
     const sets = [];
@@ -167,6 +170,7 @@ async function updateProject(req, res) {
     if (unlockThreshold !== undefined) { sets.push(`unlock_threshold = $${idx++}`); params.push(unlockThreshold); }
     if (projectOrder !== undefined) { sets.push(`project_order = $${idx++}`); params.push(projectOrder); }
     if (requirements !== undefined) { sets.push(`requirements = $${idx++}`); params.push(JSON.stringify(requirements)); }
+    if (templateRepoUrl !== undefined) { sets.push(`template_repo_url = $${idx++}`); params.push(templateRepoUrl); }
 
     if (sets.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });

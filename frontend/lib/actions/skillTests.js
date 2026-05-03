@@ -46,6 +46,22 @@ export async function getBestSkillScore(skillId) {
   return data;
 }
 
+/**
+ * Get curated resource links (videos/articles) for a skill from the DB.
+ * Returns { data: [] } if none exist — caller should fall back to YouTube API.
+ */
+export async function getSkillResources(skillId) {
+  const { data, error } = await apiFetch(`/skills/${skillId}/resources`, { method: 'GET' });
+  if (error) return { data: [], error };
+  
+  // Ensure we only return an array. If data is a string (e.g. 404 HTML) or missing the data array, return []
+  if (typeof data === 'string' || !data || !Array.isArray(data.data)) {
+    return { data: [] };
+  }
+  
+  return { data: data.data };
+}
+
 // ─── Student: Projects ────────────────────────────────────────────────────────
 
 /**

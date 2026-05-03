@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   ReactFlow,
@@ -12,9 +12,9 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
-  Trophy, Star, CheckCircle, Clock, Send, ArrowLeft,
-  Loader2, X, ExternalLink, BookOpen, Target, Play,
-  Users, BarChart3, Zap, TrendingUp, Youtube, Eye,
+  Trophy, Star, CheckCircle, Clock, ArrowLeft,
+  Loader2, X, ExternalLink, BookOpen, Play,
+  Zap, TrendingUp, Youtube, Eye,
   ThumbsUp, GraduationCap, ChevronRight, Award, Flame,
   Code, Brain, ShieldCheck, AlertCircle, Github,
   List, GitBranch, ChevronDown
@@ -26,14 +26,11 @@ import Input from '@/components/Input';
 import { useToast } from '@/components/ToastContext';
 import {
   getRoadmapWithSkills,
-  getTasksByRoadmap,
   getUserRoadmapProgress,
-  submitTaskWork,
-  provisionTaskRepo
 } from '@/lib/actions/roadmapFlow';
 import { searchYouTubeCourses } from '@/lib/actions/youtube';
 import { getSimulatorChallenges, getSimulatorProgress, getReadinessScore } from '@/lib/actions/simulator';
-import { getBestSkillScore, getSkillProjects } from '@/lib/actions/skillTests';
+import { getBestSkillScore, getSkillProjects, getSkillResources } from '@/lib/actions/skillTests';
 import SkillNode from '@/components/roadmap/SkillNode';
 import RoadmapTree from '@/components/roadmap/RoadmapTree';
 
@@ -155,7 +152,6 @@ export default function RoadmapFlowPage() {
   const [loading, setLoading] = useState(true);
   const [roadmap, setRoadmap] = useState(null);
   const [skills, setSkills] = useState([]);
-  const [tasks, setTasks] = useState([]);
   const [progress, setProgress] = useState(null);
   const [isPro, setIsPro] = useState(true);
   const [viewMode, setViewMode] = useState('tree'); // 'tree' | 'flow'
@@ -163,14 +159,13 @@ export default function RoadmapFlowPage() {
   // Side panel state
   const [selectedSkill, setSelectedSkill] = useState(null);
   const [panelOpen, setPanelOpen] = useState(false);
-  const [submitUrl, setSubmitUrl] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [selectedTask, setSelectedTask] = useState(null);
 
   // YouTube courses cache: { [skillId]: videosArray }
   const [youtubeCache, setYoutubeCache] = useState({});
   const [loadingVideos, setLoadingVideos] = useState(false);
-  const [activeTab, setActiveTab] = useState('tasks'); // 'tasks' | 'resources' | 'test'
+  // DB curated resource links cache: { [skillId]: linksArray }
+  const [dbLinksCache, setDbLinksCache] = useState({});
+  const [activeTab, setActiveTab] = useState('resources'); // 'resources' | 'test'
 
   // Skill test & gated projects cache: { [skillId]: { bestPercentage, projects, ... } }
   const [skillTestCache, setSkillTestCache] = useState({});
@@ -190,13 +185,12 @@ export default function RoadmapFlowPage() {
     async function loadData() {
       setLoading(true);
       try {
-        const [roadmapRes, tasksRes, progressRes, challengesRes, simProgressRes, readinessRes] = await Promise.all([
+        const [roadmapRes, progressRes, challengesRes, simProgressRes, readinessRes] = await Promise.all([
           getRoadmapWithSkills(params.id),
-          getTasksByRoadmap(params.id),
           getUserRoadmapProgress(params.id),
           getSimulatorChallenges(params.id),
           getSimulatorProgress(params.id),
-          getReadinessScore(null, params.id) // null = current user
+          getReadinessScore(null, params.id)
         ]);
 
         if (roadmapRes?.data) {
@@ -205,10 +199,6 @@ export default function RoadmapFlowPage() {
           if (roadmapRes.data.isPro !== undefined) setIsPro(roadmapRes.data.isPro);
         } else if (roadmapRes?.error) {
           toast.error(roadmapRes.error);
-        }
-
-        if (tasksRes?.data) {
-          setTasks(tasksRes.data);
         }
 
         if (progressRes?.data) {
@@ -235,6 +225,27 @@ export default function RoadmapFlowPage() {
     }
     loadData();
   }, [params.id, refreshKey]); // refreshKey forces refetch
+
+  // When user returns to this tab (e.g. after browser Back from skill test page),
+  // clear the cached test data for the currently selected skill so fresh score loads.
+  // Next.js router.back() triggers 'popstate'.
+  useEffect(() => {
+    const handleReturn = () => {
+      if (selectedSkill?.id) {
+        setSkillTestCache(prev => {
+          const next = { ...prev };
+          delete next[selectedSkill.id];
+          return next;
+        });
+      }
+    };
+    document.addEventListener('visibilitychange', handleReturn);
+    window.addEventListener('popstate', handleReturn);
+    return () => {
+      document.removeEventListener('visibilitychange', handleReturn);
+      window.removeEventListener('popstate', handleReturn);
+    };
+  }, [selectedSkill?.id]);
 
   // Build React Flow nodes and edges from skills
   useEffect(() => {
@@ -283,98 +294,53 @@ export default function RoadmapFlowPage() {
   const handleNodeClick = useCallback((skill) => {
     setSelectedSkill(skill);
     setPanelOpen(true);
-    setActiveTab('tasks');
-  }, []);
+    setActiveTab('resources');
+    // Bust the skill test cache so fresh score shows up if user retook a test
+    setSkillTestCache(prev => {
+      const next = { ...prev };
+      delete next[skill.id];
+      return next;
+    });
+  }, [setSkillTestCache]);
 
-  // Fetch YouTube videos when switching to resources tab
+  // Fetch Learn resources: DB links first, YouTube API as fallback
   useEffect(() => {
-    async function fetchVideos() {
+    async function fetchResources() {
       if (activeTab === 'resources' && selectedSkill) {
-        if (!youtubeCache[selectedSkill.id]) {
-          setLoadingVideos(true);
-          const result = await searchYouTubeCourses(selectedSkill.name);
-          if (result.data) {
-            setYoutubeCache(prev => ({ ...prev, [selectedSkill.id]: result.data }));
+        // Only fetch if we don't already have DB links in cache for this skill
+        if (dbLinksCache[selectedSkill.id] !== undefined) {
+          // If DB had no links, try YouTube as fallback (if not already cached)
+          if (dbLinksCache[selectedSkill.id].length === 0 && !youtubeCache[selectedSkill.id]) {
+            setLoadingVideos(true);
+            const result = await searchYouTubeCourses(selectedSkill.name);
+            if (result.data) {
+              setYoutubeCache(prev => ({ ...prev, [selectedSkill.id]: result.data }));
+            }
+            setLoadingVideos(false);
           }
-          setLoadingVideos(false);
+          return;
         }
+
+        setLoadingVideos(true);
+        // 1. Try curated DB links first
+        const dbRes = await getSkillResources(selectedSkill.id);
+        const dbLinks = dbRes.data || [];
+        setDbLinksCache(prev => ({ ...prev, [selectedSkill.id]: dbLinks }));
+
+        if (dbLinks.length === 0) {
+          // 2. Fallback: YouTube API
+          if (!youtubeCache[selectedSkill.id]) {
+            const result = await searchYouTubeCourses(selectedSkill.name);
+            if (result.data) {
+              setYoutubeCache(prev => ({ ...prev, [selectedSkill.id]: result.data }));
+            }
+          }
+        }
+        setLoadingVideos(false);
       }
     }
-    fetchVideos();
-  }, [activeTab, selectedSkill, youtubeCache]);
-
-  // Get tasks for selected skill
-  const skillTasks = useMemo(() => {
-    if (!selectedSkill || !tasks.length) return [];
-    // Match tasks by skill_id or by order (fallback)
-    return tasks.filter(t =>
-      t.skill_id === selectedSkill.id ||
-      (!t.skill_id && selectedSkill.order_index !== undefined)
-    );
-  }, [selectedSkill, tasks]);
-
-  // Get submission status for a task
-  const getTaskStatus = (taskId) => {
-    if (!progress?.submissionMap) return null;
-    return progress.submissionMap[taskId];
-  };
-
-  // Handle task submission
-  const handleSubmit = async () => {
-    if (!submitUrl || !selectedTask) return;
-
-    setSubmitting(true);
-    try {
-      const result = await submitTaskWork(selectedTask.id, submitUrl);
-
-      if (result.success) {
-        toast.success('Task submitted successfully!');
-        setSubmitUrl('');
-        setSelectedTask(null);
-        // Refresh progress
-        const progressRes = await getUserRoadmapProgress(params.id);
-        if (progressRes?.data) {
-          setProgress(progressRes.data);
-        }
-      } else {
-        toast.error(result.error || 'Failed to submit');
-      }
-    } catch (error) {
-      toast.error('Failed to submit task');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleProvisionRepo = async () => {
-    if (!selectedTask) return;
-    setSubmitting(true);
-    try {
-      const result = await provisionTaskRepo(selectedTask.id);
-      if (result.success && result.data?.codespaces_url) {
-        toast.success('Repository provisioned!');
-        // Refresh progress so we see 'in_progress' and the github_repo_url
-        const progressRes = await getUserRoadmapProgress(params.id);
-        if (progressRes?.data) setProgress(progressRes.data);
-        
-        // Open codespaces in a new tab
-        window.open(result.data.codespaces_url, '_blank');
-      } else {
-        if (result.error && result.error.includes('GitHub account not linked')) {
-          toast.info('Redirecting to GitHub to link your account...');
-          const isProd = process.env.NODE_ENV === 'production';
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || (isProd ? 'https://api.provn.live' : 'http://localhost:3000');
-          window.location.href = `${apiUrl}/auth/github`;
-        } else {
-          toast.error(result.error || 'Failed to provision repository.');
-        }
-      }
-    } catch (err) {
-      toast.error('Failed to provision repository.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    fetchResources();
+  }, [activeTab, selectedSkill, dbLinksCache, youtubeCache]);
 
   const diffColor = (d) => d === 'beginner' ? 'lime' : d === 'intermediate' ? 'yellow' : 'purple';
 
@@ -459,13 +425,6 @@ export default function RoadmapFlowPage() {
                   {completedSkillsCount}/{skills.length}
                 </span>
                 <span className="font-mono text-xs text-muted">skills</span>
-              </div>
-
-              {/* Tasks Count */}
-              <div className="flex items-center gap-2 px-3 py-2 bg-bg border-2 border-black">
-                <Target size={16} className="text-cyan-500" />
-                <span className="font-mono text-sm font-bold">{tasks.length}</span>
-                <span className="font-mono text-xs text-muted">tasks</span>
               </div>
 
               {/* Score Card */}
@@ -893,42 +852,32 @@ export default function RoadmapFlowPage() {
                   </button>
                 </div>
 
-                {/* Skill progress indicator */}
+                {/* Skill progress indicator — show test score if available */}
                 <div className="mt-4 flex items-center gap-3">
                   <div className="flex-1 h-2 bg-bg-dark border border-black overflow-hidden">
                     <div
                       className="h-full bg-purple transition-all"
                       style={{
-                        width: `${skillTasks.length ? (skillTasks.filter(t => getTaskStatus(t.id)?.status === 'approved').length / skillTasks.length * 100) : 0}%`
+                        width: `${skillTestCache[selectedSkill?.id]?.bestPercentage || 0}%`
                       }}
                     />
                   </div>
                   <span className="font-mono text-xs font-bold">
-                    {skillTasks.filter(t => getTaskStatus(t.id)?.status === 'approved').length}/{skillTasks.length}
+                    {skillTestCache[selectedSkill?.id]?.bestPercentage || 0}% tested
                   </span>
                 </div>
               </div>
 
-              {/* Tab Navigation */}
+              {/* Tab Navigation — Learn & Test only */}
               <div className="flex border-b-2 border-black">
                 <button
-                  onClick={() => setActiveTab('tasks')}
-                  className={`flex-1 py-3 font-mono text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors ${activeTab === 'tasks'
-                      ? 'bg-black text-white'
-                      : 'bg-white text-black hover:bg-bg-dark'
-                    }`}
-                >
-                  <Target size={14} />
-                  Tasks ({skillTasks.length})
-                </button>
-                <button
                   onClick={() => setActiveTab('resources')}
-                  className={`flex-1 py-3 font-mono text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors border-l-2 border-black ${activeTab === 'resources'
+                  className={`flex-1 py-3 font-mono text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors ${activeTab === 'resources'
                       ? 'bg-red-600 text-white'
                       : 'bg-white text-black hover:bg-bg-dark'
                     }`}
                 >
-                  <Youtube size={14} />
+                  <BookOpen size={14} />
                   Learn
                 </button>
                 <button
@@ -945,128 +894,88 @@ export default function RoadmapFlowPage() {
 
               {/* Tab Content */}
               <div className="flex-1 overflow-y-auto relative bg-[#fafafa]">
-                {/* 1. Tasks List */}
-                <div className={`absolute inset-0 p-4 transition-opacity duration-200 ${activeTab === 'tasks' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
-                  {skillTasks.length > 0 ? (
-                    <div className="flex flex-col gap-4">
-                      {skillTasks.map(task => {
-                        const submission = getTaskStatus(task.id);
-                        const status = submission?.status;
 
-                        return (
-                          <div
-                            key={task.id}
-                            className={`
-                              p-5 border-[3px] border-black transition-all bg-white
-                              ${status === 'approved'
-                                ? 'shadow-[4px_4px_0px_0px_#84cc16]'
-                                : status === 'pending'
-                                  ? 'shadow-[4px_4px_0px_0px_#eab308]'
-                                  : 'shadow-[4px_4px_0px_0px_#000000] hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_#000000]'
-                              }
-                            `}
-                          >
-                            <div className="flex items-start justify-between gap-2 mb-3">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <Badge variant={diffColor(task.difficulty)} size="sm">
-                                  {task.difficulty}
-                                </Badge>
-                                <Badge variant="dark" size="sm">
-                                  <Zap size={10} className="mr-1" />
-                                  {task.points} pts
-                                </Badge>
-                                {task.type === 'industry' && (
-                                  <Badge variant="purple" size="sm">
-                                    <TrendingUp size={10} className="mr-1" />
-                                    INDUSTRY
-                                  </Badge>
-                                )}
-                              </div>
-                              {status === 'approved' && (
-                                <div className="p-1.5 bg-lime border-2 border-black">
-                                  <CheckCircle size={16} />
-                                </div>
-                              )}
-                              {status === 'pending' && (
-                                <div className="p-1.5 bg-yellow border-2 border-black">
-                                  <Clock size={16} />
-                                </div>
-                              )}
-                            </div>
-
-                            <h4 className="font-black text-base uppercase mb-2">{task.title}</h4>
-                            <p className="font-mono text-xs text-muted mb-4 leading-relaxed line-clamp-3">
-                              {task.description}
-                            </p>
-
-                            {status === 'approved' ? (
-                              <div className="flex items-center justify-between bg-lime/20 border-2 border-lime px-3 py-2.5">
-                                <span className="font-mono text-xs font-bold flex items-center gap-2">
-                                  <CheckCircle size={14} /> Completed
-                                </span>
-                                <span className="font-mono text-xs font-bold bg-white px-2 py-0.5 border-2 border-black">
-                                  {submission.score}/{task.points}
-                                </span>
-                              </div>
-                            ) : status === 'pending' ? (
-                              <div className="flex items-center gap-2 bg-yellow/20 border-2 border-yellow px-3 py-2.5">
-                                <Loader2 size={14} className="animate-spin" />
-                                <span className="font-mono text-xs font-bold">
-                                  Awaiting Review
-                                </span>
-                              </div>
-                            ) : status === 'rejected' ? (
-                              <div className="flex flex-col gap-3">
-                                <div className="bg-red-50 border-2 border-red-500 px-3 py-2">
-                                  <span className="font-mono text-xs font-bold text-red-600">
-                                    ✗ {submission.feedback || 'Needs revision'}
-                                  </span>
-                                </div>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  fullWidth
-                                  icon={Send}
-                                  onClick={() => setSelectedTask(task)}
-                                >
-                                  Resubmit Work
-                                </Button>
-                              </div>
-                            ) : (
-                              <Button
-                                variant="primary"
-                                size="sm"
-                                fullWidth
-                                icon={Send}
-                                onClick={() => setSelectedTask(task)}
-                              >
-                                Submit Work
-                              </Button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-16 bg-white border-[3px] border-black border-dashed">
-                      <div className="w-16 h-16 mx-auto mb-4 bg-bg-dark border-2 border-black flex items-center justify-center">
-                        <Target size={24} className="text-muted" />
-                      </div>
-                      <p className="font-mono text-sm text-muted">
-                        No tasks for this skill yet.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* 2. YouTube Resources */}
+                {/* 1. Learn Resources: DB curated links → YouTube API fallback */}
                 <div className={`absolute inset-0 p-4 transition-opacity duration-200 ${activeTab === 'resources' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
                   {loadingVideos ? (
                     <div className="flex flex-col items-center justify-center py-16 bg-white border-[3px] border-black border-dashed">
-                      <Loader2 size={28} className="animate-spin text-red-500 mb-4" />
+                      <Loader2 size={28} className="animate-spin text-purple mb-4" />
                       <span className="font-mono text-xs font-bold uppercase text-muted tracking-wider">
-                        Finding courses...
+                        Loading resources...
                       </span>
+                    </div>
+                  ) : dbLinksCache[selectedSkill.id]?.length > 0 ? (
+                    <div className="flex flex-col gap-4">
+                      <div className="bg-black text-white p-3 font-mono text-xs font-bold uppercase flex items-center gap-2">
+                        <BookOpen size={16} className="text-lime" />
+                        Curated Resources for {selectedSkill.name}
+                      </div>
+                      {dbLinksCache[selectedSkill.id].map((link, index) => (
+                        <a
+                          key={link.id}
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group block bg-white border-[3px] border-black p-3 shadow-[4px_4px_0px_0px_#000000] hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_#000000] transition-all relative"
+                        >
+                          {index === 0 && (
+                            <div className="absolute -top-3 -right-3 px-2 py-1 bg-lime border-[3px] border-black font-mono text-[10px] font-black z-10 rotate-3">
+                              ⭐ TOP PICK
+                            </div>
+                          )}
+                          <div className="flex gap-3">
+                            {/* Thumbnail or type icon */}
+                            <div className="relative w-28 sm:w-36 h-20 flex-shrink-0 bg-black border-2 border-black overflow-hidden">
+                              {link.thumbnail ? (
+                                <img
+                                  src={link.thumbnail}
+                                  alt={link.title}
+                                  className="w-full h-full object-cover group-hover:scale-105 group-hover:opacity-80 transition-all duration-300"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  {link.type === 'video' ? (
+                                    <Youtube size={28} className="text-red-500" />
+                                  ) : link.type === 'article' ? (
+                                    <BookOpen size={28} className="text-lime" />
+                                  ) : (
+                                    <ExternalLink size={28} className="text-purple" />
+                                  )}
+                                </div>
+                              )}
+                              {link.duration && (
+                                <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 bg-black text-white font-mono text-[10px] font-bold border border-white/20">
+                                  {link.duration}
+                                </div>
+                              )}
+                              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="w-10 h-10 bg-red-600 flex items-center justify-center border-2 border-black">
+                                  <Play size={16} className="text-white ml-0.5" fill="white" />
+                                </div>
+                              </div>
+                            </div>
+                            {/* Info */}
+                            <div className="flex-1 min-w-0 py-0.5">
+                              <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                <span className={`font-mono text-[9px] font-bold uppercase px-1.5 py-0.5 border ${
+                                  link.type === 'video' ? 'bg-red-50 border-red-300 text-red-600' :
+                                  link.type === 'article' ? 'bg-lime/20 border-lime text-green-700' :
+                                  link.type === 'course' ? 'bg-purple/10 border-purple text-purple' :
+                                  'bg-bg border-black text-muted'
+                                }`}>{link.type}</span>
+                                {link.source && (
+                                  <span className="font-mono text-[9px] text-muted bg-bg-dark px-1.5 py-0.5 border border-black/10">
+                                    {link.source}
+                                  </span>
+                                )}
+                              </div>
+                              <h5 className="font-bold text-sm leading-tight line-clamp-2 group-hover:text-purple transition-colors">
+                                {link.title}
+                              </h5>
+                            </div>
+                          </div>
+                        </a>
+                      ))}
                     </div>
                   ) : youtubeCache[selectedSkill.id]?.length > 0 ? (
                     <div className="flex flex-col gap-4">
@@ -1087,10 +996,9 @@ export default function RoadmapFlowPage() {
                               ⭐ TOP PICK
                             </div>
                           )}
-
-                          <div className="flex flex-col sm:flex-row gap-4">
+                          <div className="flex flex-col sm:flex-row gap-3">
                             {/* Thumbnail */}
-                            <div className="relative w-full sm:w-40 h-24 flex-shrink-0 bg-black border-2 border-black overflow-hidden">
+                            <div className="relative w-full sm:w-36 h-20 flex-shrink-0 bg-black border-2 border-black overflow-hidden">
                               {video.thumbnail && (
                                 <img
                                   src={video.thumbnail}
@@ -1104,12 +1012,11 @@ export default function RoadmapFlowPage() {
                                 </div>
                               )}
                               <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <div className="w-12 h-12 bg-red-600 flex items-center justify-center border-2 border-black">
-                                  <Play size={20} className="text-white ml-1" fill="white" />
+                                <div className="w-10 h-10 bg-red-600 flex items-center justify-center border-2 border-black">
+                                  <Play size={16} className="text-white ml-0.5" fill="white" />
                                 </div>
                               </div>
                             </div>
-
                             {/* Info */}
                             <div className="flex-1 min-w-0 py-1">
                               <h5 className="font-bold text-sm uppercase leading-tight line-clamp-2 group-hover:text-red-600 transition-colors mb-2">
@@ -1118,7 +1025,7 @@ export default function RoadmapFlowPage() {
                               <p className="font-mono text-[10px] text-muted truncate bg-bg-dark inline-block px-2 py-0.5 border border-black/10">
                                 {video.channelTitle}
                               </p>
-                              <div className="flex items-center gap-2 mt-3 flex-wrap">
+                              <div className="flex items-center gap-2 mt-2 flex-wrap">
                                 <span className="font-mono text-[10px] text-muted flex items-center gap-1 font-bold">
                                   <Eye size={12} />
                                   {video.viewCountFormatted} views
@@ -1149,7 +1056,7 @@ export default function RoadmapFlowPage() {
                         No tutorials found
                       </p>
                       <p className="font-mono text-xs text-muted max-w-[250px] mx-auto">
-                        We couldn't automatically find courses for this skill.
+                        No curated resources or auto-found courses available for this skill yet.
                       </p>
                       <a
                         href={`https://www.youtube.com/results?search_query=${encodeURIComponent(selectedSkill.name + ' tutorial')}`}
@@ -1165,7 +1072,7 @@ export default function RoadmapFlowPage() {
                   )}
                 </div>
 
-                {/* 3. Test & Gated Projects */}
+                {/* 2. Test & Gated Projects */}
                 <div className={`absolute inset-0 transition-opacity duration-200 ${activeTab === 'test' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
                   <TestTabContent
                     selectedSkill={selectedSkill}
@@ -1179,168 +1086,8 @@ export default function RoadmapFlowPage() {
               </div>
             </>
           )}
-        </div>
-
-        {/* Submit / Provision Modal */}
-        {selectedTask && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-            <div className="w-full max-w-md bg-white border-4 border-black shadow-brutal-lg animate-in fade-in zoom-in-95 duration-200">
-              {/* Modal Header */}
-              <div className="p-4 border-b-3 border-black bg-gradient-to-r from-lime/20 to-transparent">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant={diffColor(selectedTask.difficulty)} size="sm">
-                        {selectedTask.difficulty}
-                      </Badge>
-                      <Badge variant="dark" size="sm">
-                        <Zap size={10} className="mr-1" />
-                        {selectedTask.points} pts
-                      </Badge>
-                    </div>
-                    <h3 className="heading-brutal text-lg">{selectedTask.title}</h3>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setSelectedTask(null);
-                      setSubmitUrl('');
-                    }}
-                    className="p-2 bg-white border-2 border-black shadow-brutal-xs hover:shadow-brutal transition-all"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Modal Body */}
-              <div className="p-4">
-                <p className="font-mono text-xs text-muted mb-4 leading-relaxed">
-                  {selectedTask.description}
-                </p>
-
-                {/* If the task uses a GitHub Template Repo */}
-                {selectedTask.template_repo_url ? (
-                  <>
-                    <div className="mb-4 p-3 bg-bg border-2 border-black">
-                      <h4 className="font-bold text-xs uppercase mb-2 flex items-center gap-2">
-                        <Code size={12} /> Workspace Setup
-                      </h4>
-                      <p className="font-mono text-xs text-muted mb-2">
-                        This task provides a complete development environment. Click below to provision your own copy in your GitHub account and launch Codespaces.
-                      </p>
-                      <ul className="font-mono text-[10px] text-muted space-y-1 ml-2">
-                        <li>• Environment is pre-configured with dependencies.</li>
-                        <li>• Use `provn check` to test locally.</li>
-                        <li>• Use `provn submit` when you are ready to evaluate.</li>
-                      </ul>
-                    </div>
-
-                    {getTaskStatus(selectedTask.id)?.github_repo_url ? (
-                      <div className="mb-4">
-                        <div className="p-3 bg-lime/20 border-2 border-lime mb-3">
-                          <h4 className="font-bold text-xs uppercase mb-1 flex items-center gap-2">
-                            <CheckCircle size={12} /> Repository Active
-                          </h4>
-                          <a 
-                            href={getTaskStatus(selectedTask.id).github_repo_url}
-                            target="_blank"
-                            rel="noopener noreferrer" 
-                            className="font-mono text-[10px] text-black break-all underline hover:text-purple"
-                          >
-                            {getTaskStatus(selectedTask.id).github_repo_url}
-                          </a>
-                        </div>
-                        <div className="flex flex-col gap-2">
-                           <Button
-                            variant="primary"
-                            icon={Code}
-                            onClick={() => window.open(`https://github.com/codespaces/new?repo=${getTaskStatus(selectedTask.id).github_repo_url.replace('https://github.com/','')}`, '_blank')}
-                          >
-                            Open in Codespaces
-                          </Button>
-                          <Button
-                            variant="outline"
-                            icon={Send}
-                            onClick={() => {
-                              // User can click this to "sync" or manually submit their repo
-                              setSubmitUrl(getTaskStatus(selectedTask.id).github_repo_url);
-                              handleSubmit();
-                            }}
-                          >
-                            Sync / Submit from GitHub
-                          </Button>
-                        </div>
-                        
-                        {/* Manual local option */}
-                        <div className="mt-4 pt-3 border-t-2 border-black/10">
-                          <h4 className="font-bold text-[10px] uppercase text-muted mb-2">Manual Local Option</h4>
-                          <div className="flex items-center gap-2 p-2 bg-black text-white font-mono text-[10px] overflow-x-auto relative group">
-                            <span className="text-lime-400 select-none">$</span>
-                            <code className="whitespace-nowrap">git clone {getTaskStatus(selectedTask.id).github_repo_url}.git</code>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="primary"
-                        fullWidth
-                        icon={submitting ? Loader2 : Github}
-                        onClick={() => isPro ? handleProvisionRepo() : toast.error('Pro Feature: Upgrade to use Codespaces')}
-                        disabled={submitting || !isPro}
-                      >
-                        {submitting ? 'Provisioning...' : 'Provision GitHub Repo'}
-                      </Button>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="mb-4 p-3 bg-bg border-2 border-black">
-                      <h4 className="font-bold text-xs uppercase mb-2 flex items-center gap-2">
-                        <CheckCircle size={12} /> Submission Guidelines
-                      </h4>
-                      <ul className="font-mono text-xs text-muted space-y-1">
-                        <li>• Submit a GitHub repo link or deployed URL</li>
-                        <li>• Make sure your work is publicly accessible</li>
-                        <li>• Include a README with instructions</li>
-                      </ul>
-                    </div>
-
-                    <Input
-                      label="Project URL"
-                      placeholder="https://github.com/you/project"
-                      value={submitUrl}
-                      onChange={(e) => setSubmitUrl(e.target.value)}
-                      icon={ExternalLink}
-                    />
-
-                    <div className="flex gap-3 mt-6">
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedTask(null);
-                          setSubmitUrl('');
-                        }}
-                        className="flex-1"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        variant="primary"
-                        className="flex-1"
-                        icon={submitting ? Loader2 : Send}
-                        onClick={() => isPro ? handleSubmit() : toast.error('Pro Feature: Upgrade to submit tasks')}
-                        disabled={(!submitUrl || submitting) && isPro}
-                      >
-                        {!isPro ? 'Pro Only' : submitting ? 'Submitting...' : 'Submit'}
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
+    </div>
     </div>
   );
 }
@@ -1540,26 +1287,35 @@ function TestTabContent({ selectedSkill, isPro, router, toast, skillTestCache, s
             { title: 'Beginner Project', req: 33, order: 1, color: 'lime' },
             { title: 'Intermediate Project', req: 66, order: 2, color: 'yellow' },
             { title: 'Advanced Project', req: 85, order: 3, color: 'purple' },
-          ].map((proj) => (
-            <div key={proj.order} className="p-4 border-3 border-black bg-bg-dark opacity-60 blur-[1.5px] pointer-events-none">
-              <div className="flex items-center gap-2 mb-2">
-                <Badge variant={proj.color} size="sm">Project {proj.order}</Badge>
-                <Badge variant="default" size="sm">≥{proj.req}%</Badge>
+          ].map((proj) => {
+            const isUnlocked = bestPercentage >= proj.req;
+            return (
+              <div 
+                key={proj.order} 
+                className={`p-4 border-3 border-black transition-all ${
+                  isUnlocked 
+                    ? 'bg-white shadow-brutal' 
+                    : 'bg-bg-dark opacity-60 blur-[1.5px] pointer-events-none'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant={proj.color} size="sm">Project {proj.order}</Badge>
+                  <Badge variant={isUnlocked ? 'lime' : 'default'} size="sm">
+                    {isUnlocked ? '🔓 Unlocked' : `≥${proj.req}%`}
+                  </Badge>
+                </div>
+                <h5 className="font-black text-sm uppercase mb-1">{proj.title}</h5>
+                <p className="font-mono text-[10px] text-muted">
+                  {isUnlocked ? 'Placeholder project ready! (Coming soon to DB)' : 'Take the test first to see project details.'}
+                </p>
+                {isUnlocked && (
+                  <Button variant="outline" size="sm" className="mt-3 pointer-events-none opacity-50">
+                    Submission Pending DB Seed
+                  </Button>
+                )}
               </div>
-              <h5 className="font-black text-sm uppercase mb-1">{proj.title}</h5>
-              <p className="font-mono text-[10px] text-muted">Take the test first to see project details.</p>
-            </div>
-          ))}
-          <div className="absolute inset-0 bg-black/5 flex items-center justify-center z-10 pointer-events-none">
-            <div className="text-center">
-              <div className="w-10 h-10 mx-auto mb-2 bg-white border-2 border-black flex items-center justify-center rounded-full shadow-brutal-sm">
-                <span className="text-lg">🔒</span>
-              </div>
-              <span className="font-mono text-[10px] font-bold bg-white px-2 py-1 border-2 border-black shadow-brutal-sm">
-                Score high to unlock
-              </span>
-            </div>
-          </div>
+            );
+          })}
         </div>
       )}
     </div>

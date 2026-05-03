@@ -1,5 +1,8 @@
 -- ============================================================
--- PROVN Full Schema — PostgreSQL
+-- PROVN Full Consolidated Schema — PostgreSQL
+-- This file contains the complete database structure, including
+-- all features: Auth, Curriculum, Learning, Assessment, 
+-- Execution (Codespaces), Simulator, and Hiring Pipeline.
 -- Run once: psql -d provn_db -f schema.sql
 -- ============================================================
 
@@ -7,13 +10,13 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ─────────────────────────────────────────────
--- 1. ROADMAPS (no FK deps)
+-- 1. ROADMAPS
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS roadmaps (
   id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   title         TEXT        NOT NULL,
   description   TEXT,
-  curriculum    JSONB,
+  curriculum    JSONB,      -- Legacy array-based curriculum
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -34,7 +37,7 @@ CREATE TABLE IF NOT EXISTS users (
   avatar_url          TEXT,
   github_id           TEXT        UNIQUE,
   github_username     TEXT,
-  github_access_token TEXT,
+  github_access_token TEXT,       -- Used for Codespaces & Repo access
   created_at          TIMESTAMPTZ DEFAULT NOW(),
   updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
@@ -46,7 +49,7 @@ CREATE TABLE IF NOT EXISTS skills (
   id           UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
   roadmap_id   UUID    NOT NULL REFERENCES roadmaps(id) ON DELETE CASCADE,
   name         TEXT    NOT NULL,
-  description  TEXT,
+  description  JSONB,   -- Stores rich subtopics or simple text
   position_x   FLOAT   DEFAULT 0,
   position_y   FLOAT   DEFAULT 0,
   order_index  INT     DEFAULT 0,
@@ -54,7 +57,78 @@ CREATE TABLE IF NOT EXISTS skills (
 );
 
 -- ─────────────────────────────────────────────
--- 4. TASKS
+-- 4. SKILL RESOURCE LINKS
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS skill_resource_links (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  skill_id    UUID        NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+  title       TEXT        NOT NULL,
+  url         TEXT        NOT NULL,
+  type        TEXT        CHECK (type IN ('video','article','docs','course')) DEFAULT 'video',
+  source      TEXT,       -- e.g. "YouTube", "Medium"
+  duration    TEXT,       -- e.g. "10:25"
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ─────────────────────────────────────────────
+-- 5. SKILL ASSESSMENT (MCQs)
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS skill_mcqs (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  skill_id        UUID        NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+  question        TEXT        NOT NULL,
+  options         JSONB       NOT NULL, -- Array of 4 options
+  correct_option  INT         NOT NULL, -- 0-3
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS skill_test_attempts (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  skill_id        UUID        NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+  score           INT         NOT NULL,
+  percentage      DECIMAL(5,2) NOT NULL,
+  answers         JSONB,      -- User's choices and correctness
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ─────────────────────────────────────────────
+-- 6. SKILL PROJECTS (Gated Projects)
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS skill_projects (
+  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  skill_id          UUID        NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+  title             TEXT        NOT NULL,
+  description       TEXT,
+  difficulty        TEXT        CHECK (difficulty IN ('beginner','intermediate','advanced')) DEFAULT 'beginner',
+  points            INT         DEFAULT 50,
+  unlock_threshold  INT         NOT NULL CHECK (unlock_threshold IN (33, 66, 85)),
+  project_order     INT         NOT NULL CHECK (project_order IN (1, 2, 3)),
+  requirements      JSONB,       -- List of requirements
+  template_repo_url TEXT,       -- GitHub template for Codespaces
+  created_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS skill_project_submissions (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id      UUID        NOT NULL REFERENCES skill_projects(id) ON DELETE CASCADE,
+  user_id         UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content         TEXT        NOT NULL,   -- Result URL
+  github_repo_url TEXT,                   -- Forked repo for Codespaces
+  status          TEXT        CHECK (status IN ('pending','approved','needs_revision','rejected')) DEFAULT 'pending',
+  review_method   TEXT        CHECK (review_method IN ('auto','manual')) DEFAULT 'manual',
+  score           INT         DEFAULT 0,
+  feedback        TEXT,
+  actions_run_id  TEXT,                   -- GitHub Actions tracking
+  actions_result  JSONB,                  -- Payload from Action webhook
+  reviewed_by     UUID        REFERENCES users(id) ON DELETE SET NULL,
+  reviewed_at     TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(project_id, user_id)
+);
+
+-- ─────────────────────────────────────────────
+-- 7. TASKS (Standalone / Industry)
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS tasks (
   id                    UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -73,9 +147,6 @@ CREATE TABLE IF NOT EXISTS tasks (
   created_at            TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ─────────────────────────────────────────────
--- 5. SUBMISSIONS
--- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS submissions (
   id             UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
   task_id        UUID    NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
@@ -92,7 +163,7 @@ CREATE TABLE IF NOT EXISTS submissions (
 );
 
 -- ─────────────────────────────────────────────
--- 6. SIMULATOR CHALLENGES
+-- 8. SIMULATOR
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS simulator_challenges (
   id                  UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -111,9 +182,6 @@ CREATE TABLE IF NOT EXISTS simulator_challenges (
   created_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ─────────────────────────────────────────────
--- 7. SIMULATOR ATTEMPTS
--- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS simulator_attempts (
   id                  UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id             UUID    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -132,7 +200,7 @@ CREATE TABLE IF NOT EXISTS simulator_attempts (
 );
 
 -- ─────────────────────────────────────────────
--- 8. READINESS SCORES
+-- 9. READINESS & ACTIVITY LOGS
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS readiness_scores (
   id                              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -154,8 +222,33 @@ CREATE TABLE IF NOT EXISTS readiness_scores (
   UNIQUE(user_id, roadmap_id)
 );
 
+CREATE TABLE IF NOT EXISTS activity_log (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  event_type  TEXT        NOT NULL,
+  entity_id   UUID,
+  entity_type TEXT,
+  metadata    JSONB       DEFAULT '{}',
+  points      INT         DEFAULT 0,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS skill_completion (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  skill_id        UUID        NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+  status          TEXT        NOT NULL DEFAULT 'not_started',
+  best_test_pct   DECIMAL(5,2) DEFAULT 0,
+  projects_done   INT          DEFAULT 0,
+  projects_total  INT          DEFAULT 3,
+  last_activity   TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, skill_id)
+);
+
 -- ─────────────────────────────────────────────
--- 9. JOB POSTINGS
+-- 10. MARKETPLACE (Jobs & Applications)
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS job_postings (
   id                  UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -179,9 +272,6 @@ CREATE TABLE IF NOT EXISTS job_postings (
   updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ─────────────────────────────────────────────
--- 10. TASK OPENINGS (Paid Gigs)
--- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS task_openings (
   id                  UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id          UUID    REFERENCES users(id) ON DELETE CASCADE,
@@ -204,9 +294,6 @@ CREATE TABLE IF NOT EXISTS task_openings (
   updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ─────────────────────────────────────────────
--- 11. APPLICATIONS
--- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS applications (
   id                        UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id                   UUID    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -219,7 +306,6 @@ CREATE TABLE IF NOT EXISTS applications (
   status                    TEXT    CHECK (status IN ('pending','reviewed','shortlisted','rejected','hired')) DEFAULT 'pending',
   reviewed_at               TIMESTAMPTZ,
   created_at                TIMESTAMPTZ DEFAULT NOW(),
-  -- Must apply to exactly one type
   CHECK (
     (job_id IS NOT NULL AND task_opening_id IS NULL) OR
     (job_id IS NULL AND task_opening_id IS NOT NULL)
@@ -230,22 +316,12 @@ CREATE TABLE IF NOT EXISTS applications (
 -- INDEXES
 -- ─────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_users_email              ON users(email);
-CREATE INDEX IF NOT EXISTS idx_users_role               ON users(role);
 CREATE INDEX IF NOT EXISTS idx_skills_roadmap           ON skills(roadmap_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_roadmap            ON tasks(roadmap_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_skill              ON tasks(skill_id);
-CREATE INDEX IF NOT EXISTS idx_submissions_student      ON submissions(student_id);
-CREATE INDEX IF NOT EXISTS idx_submissions_task         ON submissions(task_id);
 CREATE INDEX IF NOT EXISTS idx_submissions_status       ON submissions(status);
-CREATE INDEX IF NOT EXISTS idx_sim_challenges_roadmap   ON simulator_challenges(roadmap_id);
-CREATE INDEX IF NOT EXISTS idx_sim_attempts_user        ON simulator_attempts(user_id);
-CREATE INDEX IF NOT EXISTS idx_sim_attempts_challenge   ON simulator_attempts(challenge_id);
-CREATE INDEX IF NOT EXISTS idx_readiness_user           ON readiness_scores(user_id);
-CREATE INDEX IF NOT EXISTS idx_readiness_roadmap        ON readiness_scores(roadmap_id);
+CREATE INDEX IF NOT EXISTS idx_activity_log_user        ON activity_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_activity_log_created     ON activity_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_skill_completion_user    ON skill_completion(user_id);
 CREATE INDEX IF NOT EXISTS idx_readiness_total          ON readiness_scores(total_score DESC);
 CREATE INDEX IF NOT EXISTS idx_job_postings_status      ON job_postings(status);
-CREATE INDEX IF NOT EXISTS idx_job_postings_company     ON job_postings(company_id);
-CREATE INDEX IF NOT EXISTS idx_task_openings_status     ON task_openings(status);
 CREATE INDEX IF NOT EXISTS idx_applications_user        ON applications(user_id);
-CREATE INDEX IF NOT EXISTS idx_applications_job         ON applications(job_id);
-CREATE INDEX IF NOT EXISTS idx_applications_task        ON applications(task_opening_id);

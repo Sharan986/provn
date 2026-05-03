@@ -372,16 +372,26 @@ async function googleCallback(req, res) {
  */
 function githubAuth(req, res) {
   const referer = req.get('Referer') || '';
-  const isLocal = referer.includes('localhost') || referer.includes('127.0.0.1');
+  const host = req.get('host') || '';
+  
+  // Robust local check: referer, host, or NODE_ENV
+  const isLocal = referer.includes('localhost') || 
+                  referer.includes('127.0.0.1') || 
+                  host.includes('localhost') || 
+                  process.env.NODE_ENV === 'development';
+
   const baseUrl = isLocal
     ? 'http://localhost:3000'
     : (process.env.BASE_URL || 'https://api.provn.live');
+    
   const redirectUri = `${baseUrl}/auth/github/callback`;
 
   let path = '/dashboard/student';
   try {
     if (referer) path = new URL(referer).pathname;
   } catch (e) {}
+
+  console.log('[GitHub Auth] Generating URL -> isLocal:', isLocal, '| redirectUri:', redirectUri, '| Client ID:', process.env.GITHUB_CLIENT_ID);
 
   const stateObj = { path, isLocal, userId: req.user.id };
   const stateStr = Buffer.from(JSON.stringify(stateObj)).toString('base64');

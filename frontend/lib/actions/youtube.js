@@ -117,13 +117,9 @@ export async function searchYouTubeCourses(skillName, maxResults = 8) {
       key: YOUTUBE_API_KEY,
     });
 
-    const referer = process.env.NODE_ENV === 'development' 
-      ? 'http://localhost:3000' 
-      : (process.env.NEXT_PUBLIC_APP_URL || 'https://provn.live');
-
     const response = await fetch(`${YOUTUBE_API_URL}/search?${searchParams}`, {
       headers: {
-        'Referer': referer,
+        'Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
       },
     });
 
@@ -149,7 +145,7 @@ export async function searchYouTubeCourses(skillName, maxResults = 8) {
 
     const statsResponse = await fetch(`${YOUTUBE_API_URL}/videos?${statsParams}`, {
       headers: {
-        'Referer': referer,
+        'Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
       },
     });
     const statsData = await statsResponse.json();
