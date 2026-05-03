@@ -24,14 +24,14 @@ const SKILL_SEARCH_TEMPLATES = {
 // Build optimized search query
 function buildSearchQuery(skillName) {
   const skillLower = skillName.toLowerCase();
-  
+
   // Check for matching template
   for (const [key, query] of Object.entries(SKILL_SEARCH_TEMPLATES)) {
     if (skillLower.includes(key)) {
       return query;
     }
   }
-  
+
   // Default enhanced query
   return `${skillName} complete course tutorial 2024`;
 }
@@ -39,14 +39,14 @@ function buildSearchQuery(skillName) {
 // Format ISO 8601 duration to readable format
 function formatDuration(isoDuration) {
   if (!isoDuration) return '';
-  
+
   const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
   if (!match) return '';
-  
+
   const hours = parseInt(match[1] || 0);
   const minutes = parseInt(match[2] || 0);
   const seconds = parseInt(match[3] || 0);
-  
+
   if (hours > 0) {
     return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }
@@ -58,7 +58,7 @@ function durationToMinutes(isoDuration) {
   if (!isoDuration) return 0;
   const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
   if (!match) return 0;
-  
+
   const hours = parseInt(match[1] || 0);
   const minutes = parseInt(match[2] || 0);
   return hours * 60 + minutes;
@@ -80,18 +80,18 @@ function calculateEngagementScore(video) {
   const views = video.viewCount || 0;
   const likes = video.likeCount || 0;
   const duration = video.durationMinutes || 0;
-  
+
   if (views === 0) return 0;
-  
+
   // Like ratio (likes per 1000 views) - higher is better
   const likeRatio = (likes / views) * 1000;
-  
+
   // View score (log scale to not over-favor viral videos)
   const viewScore = Math.log10(Math.max(views, 1));
-  
+
   // Duration bonus (prefer longer, more comprehensive content)
   const durationBonus = duration >= 60 ? 1.5 : duration >= 30 ? 1.2 : 1;
-  
+
   // Combined score
   return (likeRatio * 2 + viewScore * 1.5) * durationBonus;
 }
@@ -104,7 +104,7 @@ export async function searchYouTubeCourses(skillName, maxResults = 8) {
 
   try {
     const searchQuery = buildSearchQuery(skillName);
-    
+
     const searchParams = new URLSearchParams({
       part: 'snippet',
       q: searchQuery,
@@ -122,7 +122,7 @@ export async function searchYouTubeCourses(skillName, maxResults = 8) {
         'Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
       },
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       console.error('YouTube API error:', error);
@@ -130,11 +130,11 @@ export async function searchYouTubeCourses(skillName, maxResults = 8) {
     }
 
     const data = await response.json();
-    
+
     if (!data.items?.length) {
       return { data: [] };
     }
-    
+
     // Get video statistics and content details
     const videoIds = data.items.map(item => item.id.videoId).join(',');
     const statsParams = new URLSearchParams({
@@ -149,7 +149,7 @@ export async function searchYouTubeCourses(skillName, maxResults = 8) {
       },
     });
     const statsData = await statsResponse.json();
-    
+
     // Create a map for quick lookup
     const statsMap = {};
     statsData.items?.forEach(item => {
@@ -164,11 +164,11 @@ export async function searchYouTubeCourses(skillName, maxResults = 8) {
       const videoId = item.id.videoId;
       const stats = statsMap[videoId]?.statistics || {};
       const contentDetails = statsMap[videoId]?.contentDetails || {};
-      
+
       const viewCount = parseInt(stats.viewCount || 0);
       const likeCount = parseInt(stats.likeCount || 0);
       const durationMinutes = durationToMinutes(contentDetails.duration);
-      
+
       return {
         id: videoId,
         title: item.snippet.title,
@@ -199,7 +199,7 @@ export async function searchYouTubeCourses(skillName, maxResults = 8) {
       // Filter out obviously bad titles
       const badPatterns = /shorts|#shorts|tiktok|meme|funny|prank/i;
       if (badPatterns.test(video.title)) return false;
-      
+
       return true;
     });
 

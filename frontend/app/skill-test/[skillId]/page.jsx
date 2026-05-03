@@ -223,7 +223,10 @@ export default function SkillTestPage() {
                 <Button variant="outline" className="flex-1" icon={RotateCcw} onClick={() => window.location.reload()}>
                   Retake
                 </Button>
-                <Button variant="primary" className="flex-1" onClick={() => router.back()}>
+                <Button variant="primary" className="flex-1" onClick={() => {
+                  // Navigate back; the page will detect visibilitychange and refresh scores
+                  router.back();
+                }}>
                   Back to Roadmap
                 </Button>
               </div>

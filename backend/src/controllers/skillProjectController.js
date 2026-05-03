@@ -45,9 +45,10 @@ async function getSkillProjects(req, res) {
     }
 
     // Add lock/unlock status and submission info to each project
+    // As per user request, taking the test (bestPercentage > 0) unlocks all 3 projects.
     const enrichedProjects = projects.map(project => ({
       ...project,
-      isUnlocked: bestPercentage >= project.unlock_threshold,
+      isUnlocked: bestPercentage > 0,
       submission: submissionMap[project.id] || null,
     }));
 
@@ -63,6 +64,62 @@ async function getSkillProjects(req, res) {
   } catch (err) {
     console.error('getSkillProjects error:', err);
     return res.status(500).json({ error: 'Failed to fetch skill projects' });
+  }
+}
+
+/**
+ * GET /api/skills/projects/:projectId
+ * Returns single project details and submission info
+ */
+async function getProjectDetails(req, res) {
+  const projectId = req.params.projectId;
+
+  try {
+    const { rows: projects } = await pool.query(
+      `SELECT sp.*, s.name as skill_name 
+       FROM skill_projects sp
+       JOIN skills s ON sp.skill_id = s.id
+       WHERE sp.id = $1`,
+      [projectId]
+    );
+
+    if (!projects.length) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    const project = projects[0];
+
+    // Get user's submission for this project
+    const { rows: submissions } = await pool.query(
+      `SELECT * FROM skill_project_submissions
+       WHERE user_id = $1 AND project_id = $2`,
+      [req.user.id, projectId]
+    );
+
+    const submission = submissions.length ? submissions[0] : null;
+
+    // Check unlock status using best skill test percentage (taking the test unlocks it)
+    const { rows: scoreRows } = await pool.query(
+      `SELECT COALESCE(MAX(percentage), 0) AS best_percentage
+       FROM skill_test_attempts
+       WHERE user_id = $1 AND skill_id = $2`,
+      [req.user.id, project.skill_id]
+    );
+    const bestPercentage = parseFloat(scoreRows[0].best_percentage);
+    const isUnlocked = bestPercentage > 0;
+
+    return res.json({
+      data: {
+        project: {
+          ...project,
+          isUnlocked,
+          submission
+        }
+      }
+    });
+  } catch (err) {
+    console.error('getProjectDetails error:', err);
+    return res.status(500).json({ error: 'Failed to fetch project details' });
   }
 }
 
@@ -89,7 +146,7 @@ async function submitProject(req, res) {
       return res.status(404).json({ error: 'Project not found' });
     }
 
-    // Check user's best score meets the threshold
+    // Check user's best score meets the threshold (just taking the test unlocks it now)
     const { rows: scoreRows } = await pool.query(
       `SELECT COALESCE(MAX(percentage), 0) AS best_percentage
        FROM skill_test_attempts
@@ -98,19 +155,22 @@ async function submitProject(req, res) {
     );
     const bestPercentage = parseFloat(scoreRows[0].best_percentage);
 
-    if (bestPercentage < projectRows[0].unlock_threshold) {
+    if (bestPercentage <= 0) {
       return res.status(403).json({
-        error: `You need at least ${projectRows[0].unlock_threshold}% on the skill test to unlock this project. Your best: ${bestPercentage}%`
+        error: `You need to take the skill test to unlock projects.`
       });
     }
 
+    const githubRepoUrl = req.body.githubRepoUrl || null;
+    const reviewMethod = req.body.reviewMethod || 'manual';
+
     // Upsert submission (one per user per project)
     const { rows } = await pool.query(
-      `INSERT INTO skill_project_submissions (project_id, user_id, content)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (project_id, user_id) DO UPDATE SET content = $3, status = 'pending', created_at = NOW()
+      `INSERT INTO skill_project_submissions (project_id, user_id, content, github_repo_url, review_method)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (project_id, user_id) DO UPDATE SET content = $3, github_repo_url = $4, review_method = $5, status = 'pending', created_at = NOW()
        RETURNING id`,
-      [projectId, req.user.id, content]
+      [projectId, req.user.id, content, githubRepoUrl, reviewMethod]
     );
 
     return res.status(201).json({ success: true, data: { submissionId: rows[0].id } });
@@ -127,7 +187,7 @@ async function submitProject(req, res) {
  * Body: { title, description, difficulty, points, unlockThreshold, projectOrder, requirements }
  */
 async function createProject(req, res) {
-  const { title, description, difficulty, points, unlockThreshold, projectOrder, requirements } = req.body;
+  const { title, description, difficulty, points, unlockThreshold, projectOrder, requirements, templateRepoUrl } = req.body;
   const skillId = req.params.skillId;
 
   if (!title || !unlockThreshold || !projectOrder) {
@@ -136,10 +196,10 @@ async function createProject(req, res) {
 
   try {
     const { rows } = await pool.query(
-      `INSERT INTO skill_projects (skill_id, title, description, difficulty, points, unlock_threshold, project_order, requirements)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO skill_projects (skill_id, title, description, difficulty, points, unlock_threshold, project_order, requirements, template_repo_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING id`,
-      [skillId, title, description || null, difficulty || 'beginner', points || 50, unlockThreshold, projectOrder, requirements ? JSON.stringify(requirements) : null]
+      [skillId, title, description || null, difficulty || 'beginner', points || 50, unlockThreshold, projectOrder, requirements ? JSON.stringify(requirements) : null, templateRepoUrl || null]
     );
 
     return res.status(201).json({ success: true, data: { projectId: rows[0].id } });
@@ -153,7 +213,7 @@ async function createProject(req, res) {
  * PUT /api/projects/:projectId
  */
 async function updateProject(req, res) {
-  const { title, description, difficulty, points, unlockThreshold, projectOrder, requirements } = req.body;
+  const { title, description, difficulty, points, unlockThreshold, projectOrder, requirements, templateRepoUrl } = req.body;
 
   try {
     const sets = [];
@@ -167,6 +227,7 @@ async function updateProject(req, res) {
     if (unlockThreshold !== undefined) { sets.push(`unlock_threshold = $${idx++}`); params.push(unlockThreshold); }
     if (projectOrder !== undefined) { sets.push(`project_order = $${idx++}`); params.push(projectOrder); }
     if (requirements !== undefined) { sets.push(`requirements = $${idx++}`); params.push(JSON.stringify(requirements)); }
+    if (templateRepoUrl !== undefined) { sets.push(`template_repo_url = $${idx++}`); params.push(templateRepoUrl); }
 
     if (sets.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
@@ -205,6 +266,7 @@ async function deleteProject(req, res) {
 
 module.exports = {
   getSkillProjects,
+  getProjectDetails,
   submitProject,
   createProject,
   updateProject,

@@ -16,11 +16,18 @@ const {
 } = require('../controllers/skillTestController');
 const {
   getSkillProjects,
+  getProjectDetails,
   submitProject,
   createProject,
   updateProject,
   deleteProject,
 } = require('../controllers/skillProjectController');
+const {
+  getSkillResources,
+  createSkillResource,
+  updateSkillResource,
+  deleteSkillResource,
+} = require('../controllers/skillResourceController');
 
 // ─── Student: Test ────────────────────────────────────────────────────────────
 router.get('/:skillId/test',          requireAuth, getSkillTest);
@@ -30,6 +37,7 @@ router.get('/:skillId/test/best',     requireAuth, getBestScore);
 
 // ─── Student: Projects ────────────────────────────────────────────────────────
 router.get('/:skillId/projects',            requireAuth, getSkillProjects);
+router.get('/projects/:projectId',          requireAuth, getProjectDetails);
 router.post('/:skillId/projects/:id/submit', requireAuth, requirePro, submitProject);
 
 // ─── Admin: MCQs ──────────────────────────────────────────────────────────────
@@ -43,5 +51,13 @@ router.delete('/mcqs/:mcqId',       requireAuth, requireRole('admin'), deleteMCQ
 router.post('/:skillId/projects',        requireAuth, requireRole('admin'), createProject);
 router.put('/projects/:projectId',       requireAuth, requireRole('admin'), updateProject);
 router.delete('/projects/:projectId',    requireAuth, requireRole('admin'), deleteProject);
+
+// ─── Student: Resource Links ──────────────────────────────────────────────────
+router.get('/:skillId/resources',        requireAuth, getSkillResources);
+
+// ─── Admin: Resource Links ────────────────────────────────────────────────────
+router.post('/:skillId/resources',       requireAuth, requireRole('admin'), createSkillResource);
+router.put('/resources/:id',             requireAuth, requireRole('admin'), updateSkillResource);
+router.delete('/resources/:id',          requireAuth, requireRole('admin'), deleteSkillResource);
 
 module.exports = router;

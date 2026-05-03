@@ -372,13 +372,28 @@ async function googleCallback(req, res) {
  */
 function githubAuth(req, res) {
   const referer = req.get('Referer') || '';
-  const isLocal = referer.includes('localhost') || referer.includes('127.0.0.1');
+  const host = req.get('host') || '';
+  
+  // Robust local check: referer, host, or NODE_ENV
+  const isLocal = referer.includes('localhost') || 
+                  referer.includes('127.0.0.1') || 
+                  host.includes('localhost') || 
+                  process.env.NODE_ENV === 'development';
+
   const baseUrl = isLocal
     ? 'http://localhost:3000'
     : (process.env.BASE_URL || 'https://api.provn.live');
+    
   const redirectUri = `${baseUrl}/auth/github/callback`;
 
-  const stateObj = { path: '/dashboard/student', isLocal };
+  let path = '/dashboard/student';
+  try {
+    if (referer) path = new URL(referer).pathname;
+  } catch (e) {}
+
+  console.log('[GitHub Auth] Generating URL -> isLocal:', isLocal, '| redirectUri:', redirectUri, '| Client ID:', process.env.GITHUB_CLIENT_ID);
+
+  const stateObj = { path, isLocal, userId: req.user.id };
   const stateStr = Buffer.from(JSON.stringify(stateObj)).toString('base64');
 
   const url = githubService.getGithubAuthUrl(stateStr, redirectUri);
@@ -426,37 +441,26 @@ async function githubCallback(req, res) {
     const name = githubUser.name || githubUser.login;
     const picture = githubUser.avatar_url;
 
-    let { rows } = await pool.query(
-      'SELECT * FROM users WHERE github_id = $1 OR email = $2',
-      [githubUser.id.toString(), email.toLowerCase()]
-    );
-
-    let user = rows[0];
-    let isNewUser = false;
-
-    if (!user) {
-      const { rows: newRows } = await pool.query(
-        `INSERT INTO users (email, name, role, avatar_url, password_hash, github_id, github_username, github_access_token)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         RETURNING *`,
-        [email.toLowerCase(), name, 'student', picture, 'oauth_placeholder',
-         githubUser.id.toString(), githubUser.login, accessToken]
-      );
-      user = newRows[0];
-      isNewUser = true;
-    } else {
-      // Update github token and identifiers
-      await pool.query(
-        `UPDATE users SET github_id = $1, github_username = $2, github_access_token = $3, updated_at = NOW() WHERE id = $4`,
-        [githubUser.id.toString(), githubUser.login, accessToken, user.id]
-      );
+    let userId = null;
+    if (state) {
+      try {
+        const stateObj = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
+        userId = stateObj.userId;
+      } catch(e) {}
     }
 
-    const { accessToken: jwtAccess, refreshToken: jwtRefresh } = signTokens(user.id, user.role);
-    setTokenCookies(req, res, jwtAccess, jwtRefresh);
+    if (!userId) {
+      throw new Error('You must be logged in to link your GitHub account.');
+    }
 
-    const redirectPath = isNewUser ? '/onboarding/student' : originalPath;
-    return res.redirect(`${FRONTEND_URL}${redirectPath}`);
+    // Link the GitHub account to the currently logged in user
+    await pool.query(
+      `UPDATE users SET github_id = $1, github_username = $2, github_access_token = $3, updated_at = NOW() WHERE id = $4`,
+      [githubUser.id.toString(), githubUser.login, accessToken, userId]
+    );
+
+    // Redirect back to the roadmap/dashboard
+    return res.redirect(`${FRONTEND_URL}${originalPath}`);
   } catch (err) {
     console.error('githubCallback error:', err);
     return res.redirect(`${FRONTEND_URL}/auth?error=github_failed`);
